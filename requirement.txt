@@ -1,0 +1,310 @@
+I want to build a standalone, reusable, multi-tenant AI Customer Support Platform that can be used by any company. I will build one central AI system, and multiple independent companies will be able to use it for their own customer support. Each company will have its own isolated configuration, knowledge base, database connections, API connections, LLM configuration, MCP tools, chat widget, conversations, and customer data. One company's information must never be accessible to another company.
+
+When a company signs up for my platform, the system should automatically create a company/tenant record and generate a unique `company_id`. The company does not need to manually enter or create this ID. The `company_id` will be the central identifier used to associate and isolate all resources belonging to that company. The company representative will have an account to log into the platform dashboard and configure the AI support system, but end customers using the chatbot on the company's website or application will not need an account on my platform.
+
+After signup, the company should receive access to a dashboard where it can configure its AI support system. The main configuration areas should include Knowledge Base, Database Connections, API Connections, AI/LLM Settings, MCP Tool Access, and JavaScript Chat Widget configuration.
+
+The company should have a Knowledge Base where it can upload documents such as PDFs, DOCX files, TXT files, FAQs, product manuals, pricing documents, refund policies, company policies, and other company-specific documents. When a document is uploaded, the system should identify the company, associate the document with its `company_id`, extract the text, split it into chunks, generate embeddings, and store the searchable chunks in a vector database. Every chunk must contain the company's identity as metadata so that RAG searches only retrieve documents belonging to the correct company. If a company uploads a new document later, that document should automatically be processed and become available to the AI without requiring changes to the main database structure.
+
+The company should also have a Database Connections section. The company should be able to select the type of database it wants to connect, such as MySQL, PostgreSQL, SQL Server, or MongoDB, and enter the required connection credentials. The system should allow the company to test the connection before saving it. Database credentials must be encrypted and must never be exposed to the frontend or to the end customer.
+
+After the database connection is successfully established, the platform should inspect the connected database and retrieve the available database structure. For relational databases, this should include schemas, tables, columns, and relevant metadata. For example, after connecting a database, the company may see:
+
+```text
+Connected Database: ABC Store Production Database
+
+Available Tables:
+
+[ ] customers
+[ ] orders
+[ ] order_items
+[ ] products
+[ ] invoices
+[ ] employees
+[ ] internal_finance
+```
+
+The company should then explicitly choose which tables or collections it wants to give the AI support system access to. For example:
+
+```text
+Allowed for AI Support:
+
+[x] customers
+[x] orders
+[x] order_items
+[x] products
+[ ] employees
+[ ] internal_finance
+```
+
+Only the selected tables should be available to the AI. The AI must not automatically gain access to the entire connected database simply because a connection was successful. The company should remain in control of exactly which data sources are exposed to the AI support system.
+
+The system should store this access configuration against the database connection and the company. For example, the platform may maintain an internal record of allowed tables such as:
+
+```text
+company_id = company_001
+connection_id = database_001
+
+Allowed Resources:
+- customers
+- orders
+- order_items
+- products
+```
+
+The database should preferably be connected using read-only credentials. The system should not allow the AI to modify, delete, insert, or update company data unless write operations are explicitly designed and approved in a future version.
+
+The database connection should then be integrated with an MCP-based tool layer. The purpose of MCP in this system is to provide the AI with controlled, structured access to company data rather than allowing the LLM to directly connect to and freely query a database.
+
+The architecture should work conceptually as follows:
+
+```text
+Company Database
+        ↓
+Database Connection
+        ↓
+Schema / Table Discovery
+        ↓
+Company Selects Allowed Tables
+        ↓
+Access Policy Created
+        ↓
+MCP Server / MCP Tool Layer
+        ↓
+Only Approved Tools and Data
+        ↓
+AI Support System
+```
+
+The MCP layer should expose tools based only on the data that the company has approved. For example, instead of giving the LLM unrestricted database access, the MCP server could expose controlled tools such as:
+
+```text
+get_order_status
+get_customer_orders
+get_order_details
+get_product_availability
+get_invoice_status
+```
+
+The AI can call an MCP tool when it needs live data. The MCP server validates the request, checks the company identity and access permissions, performs the approved database operation using the correct connection, and returns only the necessary result to the AI.
+
+The flow should conceptually be:
+
+```text
+Customer Question
+        ↓
+Identify Company
+        ↓
+AI Determines Live Data Is Required
+        ↓
+Load Company's Allowed MCP Tools
+        ↓
+AI Selects Appropriate Tool
+        ↓
+MCP Server Validates Access
+        ↓
+Use Company's Database Connection
+        ↓
+Query Only Allowed Tables/Data
+        ↓
+Return Result
+        ↓
+LLM Generates Final Answer
+```
+
+For example, if a customer asks:
+
+> Where is my order?
+
+The system should identify the company from the widget key. It should then load only that company's configured MCP tools. If the company has approved access to the `orders` table, an MCP tool such as `get_order_status` can be available. The AI calls that tool with the required validated information, the MCP layer queries the company's approved database resources, returns the result, and the LLM generates a natural language answer.
+
+If the company has not approved the `orders` table, then no MCP tool requiring that table should be available to the AI. The AI must not bypass the MCP access policy and directly query the table.
+
+The platform should also support external APIs. The company should have an API Connections section where it can configure an external API by entering the required connection information, such as:
+
+```text
+Connection Name
+API Base URL
+Authentication Type
+API Key / Bearer Token / OAuth Configuration
+Additional Headers
+```
+
+The API credentials must be encrypted and securely stored. After connecting the API, the company should be able to define or discover the API operations that the AI support system is allowed to use.
+
+For example, the company may configure an API with operations such as:
+
+```text
+GET /orders/{order_id}
+GET /customers/{customer_id}
+GET /subscriptions/{subscription_id}
+GET /tickets/{ticket_id}
+```
+
+The company should explicitly select which API endpoints or operations the AI is allowed to access. For example:
+
+```text
+Allowed API Operations:
+
+[x] Get Order
+[x] Get Subscription
+[x] Get Support Ticket
+[ ] Cancel Subscription
+[ ] Delete Customer
+```
+
+Only the approved API operations should be exposed through MCP tools.
+
+The API architecture should therefore work as:
+
+```text
+External API
+      ↓
+API Connection
+      ↓
+API Endpoint / Operation Configuration
+      ↓
+Company Selects Allowed Operations
+      ↓
+Access Policy Created
+      ↓
+MCP Server / Tool Layer
+      ↓
+Approved MCP Tools
+      ↓
+AI
+```
+
+For example, an approved API operation could become an MCP tool conceptually similar to:
+
+```text
+get_order(order_id)
+
+get_subscription(subscription_id)
+
+get_ticket_status(ticket_id)
+```
+
+The AI should only see and call the tools that are enabled for that specific company.
+
+The platform should support different LLM providers. Each company should have an AI/LLM Configuration section where it can select a provider such as OpenAI, Anthropic, or Google Gemini. The company should provide its own API key and select the model it wants to use. The configuration should include:
+
+```text
+company_id
+provider
+encrypted_api_key
+model
+is_active
+```
+
+The API key must be encrypted at rest and never returned to the frontend in plain text. The backend should load the correct LLM provider and model dynamically based on the company configuration.
+
+The central AI system should have an intelligent query router. When a customer sends a message, the system should first identify the company and load that company's configuration. The router should then determine whether the question requires RAG knowledge, live database data through MCP, live API data through MCP, a combination of these sources, or human escalation.
+
+The possible routes should be:
+
+```text
+RAG
+DATABASE_MCP
+API_MCP
+RAG + DATABASE_MCP
+RAG + API_MCP
+ESCALATION
+```
+
+For example:
+
+> What is your refund policy?
+
+This should use RAG because the answer comes from company documentation.
+
+> Where is my order?
+
+This should use an MCP database or API tool because it requires live company data.
+
+> My subscription renewed today. Can I receive a refund?
+
+This may require both live data and company knowledge:
+
+```text
+Database/API MCP Tool
+        +
+RAG Search
+        ↓
+Combined Context
+        ↓
+Company's Selected LLM
+        ↓
+Final Answer
+```
+
+The platform should provide one reusable JavaScript chat widget. Every company should receive its own unique public `widget_key`. The company should place the generated JavaScript snippet on its own website or application. The same central widget code and backend should be used by every company.
+
+Conceptually, the company would embed:
+
+```html
+<script
+  src="https://my-platform.com/widget.js"
+  data-widget-key="company_unique_public_key">
+</script>
+```
+
+The JavaScript widget should only act as the chat interface and communication layer. It must not contain the company's LLM API key, database credentials, API credentials, MCP credentials, or other private information.
+
+When an end customer sends a message, the widget sends the message and public widget key to the central backend. The backend validates the widget key, identifies the associated company, obtains the internal `company_id`, and loads only that company's resources.
+
+The complete runtime flow should be:
+
+```text
+End Customer
+      ↓
+Company Website or Application
+      ↓
+JavaScript Chat Widget
+      ↓
+widget_key + Message
+      ↓
+Central Backend
+      ↓
+Validate Widget Key
+      ↓
+Identify company_id
+      ↓
+Load Company Configuration
+      │
+      ├── Knowledge Base
+      ├── LLM Configuration
+      ├── Database Connections
+      ├── API Connections
+      └── Allowed MCP Tools
+      ↓
+AI Query Router
+      │
+      ├── RAG
+      ├── Database MCP Tool
+      ├── API MCP Tool
+      ├── Combination of Sources
+      └── Escalation
+      ↓
+Retrieve Required Information
+      ↓
+Send Context and Tool Results to Selected LLM
+      ↓
+Generate Final Response
+      ↓
+Store Conversation
+      ↓
+Return Response to JavaScript Widget
+```
+
+Every conversation and message must also belong to the correct company. The end customer using the chatbot does not need a platform account. A platform account is only needed for the company representative who signs up and manages the company's configuration.
+
+The platform should also support human escalation. If the customer explicitly requests a human, if RAG cannot find relevant information, if no appropriate MCP tool is available, if the live data request fails, or if the AI cannot provide a reliable answer, the conversation should be marked as escalated. The company's support team should be able to access the conversation history and continue the support process.
+
+The central principle of the platform is that I am building one AI support system for many companies. Each company signs up and automatically receives a unique `company_id`. It configures its own documents, database connections, API connections, LLM provider, API key, model, and widget. After connecting a database, the system discovers the available tables or collections and allows the company to explicitly choose which ones the AI is allowed to access. After connecting an API, the company explicitly selects which API operations the AI is allowed to use.
+
+These approved database tables and API operations are then represented through a controlled MCP tool layer. The AI does not receive unrestricted access to the company's database or API. Instead, it receives only the MCP tools that correspond to the data and operations explicitly approved by that company. The MCP layer enforces the company's access boundaries and provides structured live data to the AI.
+
+The same JavaScript widget is embedded on every company's website or application, but each widget key maps to a different company. When a customer asks a question, the central backend identifies the company, uses only that company's RAG knowledge, MCP tools, database/API connections, and selected LLM, generates the answer, and returns it to the widget.
+
+The final product should be a secure, modular, extensible, multi-tenant AI Customer Support SaaS platform where companies can connect their own knowledge, databases, APIs, and LLM providers while maintaining complete control over which live data and operations are exposed to the AI through MCP.

@@ -1,0 +1,35 @@
+# Technology Stack
+
+## Frontend
+- Next.js
+- TypeScript
+
+## Backend
+- Python
+- FastAPI
+
+## Main Database
+- PostgreSQL
+
+## Vector Database
+- Qdrant
+
+## AI / LLM
+- OpenAI
+- Anthropic
+- Google Gemini
+
+## MCP
+- Python MCP
+
+## Embeddings
+- To be decided
+
+## Authentication
+- To be decided
+
+## File Storage
+- To be decided
+
+## Deployment
+- To be decided
