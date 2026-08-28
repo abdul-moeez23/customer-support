@@ -15,10 +15,10 @@ services:
       - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/aicustomer
       - MCP_SERVER_URL=http://mcp:8001
       - MCP_SECRET_KEY=${MCP_SECRET_KEY:-dev-mcp-secret-change-in-production}
+      - WATCHFILES_FORCE_POLLING=true
     depends_on:
       - db
       - mcp
-    restart: always
 
   mcp:
     build:
@@ -35,7 +35,6 @@ services:
       - MCP_SECRET_KEY=${MCP_SECRET_KEY:-dev-mcp-secret-change-in-production}
     depends_on:
       - db
-    restart: always
 
   frontend:
     build:
@@ -50,9 +49,10 @@ services:
       - .env
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
     depends_on:
       - backend
-    restart: always
 
   db:
     image: postgres:15
@@ -64,7 +64,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: always
 
   pgadmin:
     image: dpage/pgadmin4
@@ -75,7 +74,6 @@ services:
       - "5050:80"
     depends_on:
       - db
-    restart: always
 
 volumes:
   postgres_data:

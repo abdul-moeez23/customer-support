@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Copy, Check, Activity, Shield, Key, Layout, Server, Database, Code2 } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
 
   useEffect(() => {
     const fetchCompany = async () => {
@@ -33,10 +37,19 @@ export default function DashboardPage() {
     fetchCompany();
   }, [router]);
 
+  const copyToClipboard = (text: string, setter: (val: boolean) => void) => {
+    navigator.clipboard.writeText(text);
+    setter(true);
+    setTimeout(() => setter(false), 2000);
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500 font-medium">Loading your dashboard...</p>
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-medium animate-pulse">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -44,81 +57,149 @@ export default function DashboardPage() {
   if (!company) return null;
 
   return (
-    <div className="p-8">
-      <header className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900">Welcome back, {company.name}</h2>
-        <p className="text-gray-500 mt-2">Here is the integration status and details for your AI Support system.</p>
+    <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">
+            Welcome back, {company.name}
+          </h2>
+          <p className="text-slate-500 mt-2 font-medium">
+            Here is the integration status and details for your AI Support system.
+          </p>
+        </div>
+        <div className="flex items-center space-x-2 text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shadow-sm">
+          <Activity className="w-4 h-4" />
+          <span>System Operational</span>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Company Info Card */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-5">Integration Details</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Integration Details Card */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+              <Key className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">Integration Details</h3>
+          </div>
           
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Company ID</label>
-              <div className="flex items-center space-x-2">
-                <code className="flex-1 bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5 text-sm text-gray-800 font-mono">{company.id}</code>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Company ID</label>
+              <div className="flex items-center space-x-2 group">
+                <code className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-800 font-mono shadow-inner overflow-x-auto whitespace-nowrap">
+                  {company.id}
+                </code>
                 <button 
-                  onClick={() => navigator.clipboard.writeText(company.id)}
-                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200 transition-colors font-medium">Copy</button>
+                  onClick={() => copyToClipboard(company.id, setCopiedId)}
+                  className="p-3 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  title="Copy Company ID"
+                >
+                  {copiedId ? <Check className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5" />}
+                </button>
               </div>
-              <p className="text-xs text-gray-500 mt-1.5">Internal identifier for backend tracking.</p>
+              <p className="text-xs text-slate-500 mt-2 font-medium">Internal identifier for backend tracking.</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Public Widget Key</label>
-              <div className="flex items-center space-x-2">
-                <code className="flex-1 bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5 text-sm text-gray-800 font-mono">{company.widget_key}</code>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Public Widget Key</label>
+              <div className="flex items-center space-x-2 group">
+                <code className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-800 font-mono shadow-inner overflow-x-auto whitespace-nowrap">
+                  {company.widget_key}
+                </code>
                 <button 
-                  onClick={() => navigator.clipboard.writeText(company.widget_key)}
-                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200 transition-colors font-medium">Copy</button>
+                  onClick={() => copyToClipboard(company.widget_key, setCopiedKey)}
+                  className="p-3 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  title="Copy Widget Key"
+                >
+                  {copiedKey ? <Check className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5" />}
+                </button>
               </div>
-              <p className="text-xs text-gray-500 mt-1.5">Use this key strictly in your frontend widget snippet.</p>
+              <p className="text-xs text-slate-500 mt-2 font-medium">Use this key strictly in your frontend widget snippet.</p>
             </div>
           </div>
         </div>
 
         {/* Quick Stats Card */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col">
-          <h3 className="text-lg font-semibold text-gray-900 mb-5">System Status</h3>
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+              <Shield className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">System Status</h3>
+          </div>
           
           <div className="space-y-4 flex-1">
-            <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-              <span className="text-sm font-medium text-gray-500">LLM Provider</span>
-              <span className="px-2.5 py-1 bg-green-100 text-green-700 text-xs rounded-full font-semibold">OpenAI Connected</span>
+            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <div className="flex items-center space-x-3">
+                <Server className="w-4 h-4 text-slate-400" />
+                <span className="text-sm font-semibold text-slate-700">LLM Provider</span>
+              </div>
+              <span className="px-3 py-1 bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs rounded-full font-bold">OpenAI Connected</span>
             </div>
-            <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-              <span className="text-sm font-medium text-gray-500">Database Access</span>
-              <span className="px-2.5 py-1 bg-green-100 text-green-700 text-xs rounded-full font-semibold">PostgreSQL Connected</span>
+            
+            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <div className="flex items-center space-x-3">
+                <Database className="w-4 h-4 text-slate-400" />
+                <span className="text-sm font-semibold text-slate-700">Database Access</span>
+              </div>
+              <span className="px-3 py-1 bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs rounded-full font-bold">PostgreSQL Connected</span>
             </div>
-            <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-              <span className="text-sm font-medium text-gray-500">Knowledge Base</span>
-              <span className="text-sm text-gray-900 font-medium">0 Documents Synced</span>
+            
+            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <div className="flex items-center space-x-3">
+                <Layout className="w-4 h-4 text-slate-400" />
+                <span className="text-sm font-semibold text-slate-700">Knowledge Base</span>
+              </div>
+              <span className="text-sm text-slate-900 font-bold bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm">0 Docs Synced</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-500">Active MCP Tools</span>
-              <span className="text-sm text-gray-900 font-medium">0 Tools Allowed</span>
+            
+            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <div className="flex items-center space-x-3">
+                <Code2 className="w-4 h-4 text-slate-400" />
+                <span className="text-sm font-semibold text-slate-700">Active MCP Tools</span>
+              </div>
+              <span className="text-sm text-slate-900 font-bold bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm">0 Tools Allowed</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Widget Snippet */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Embed Chat Widget</h3>
-        <p className="text-sm text-gray-500 mb-4">Paste this code right before the closing <code>&lt;/body&gt;</code> tag of your website.</p>
-        
-        <div className="relative">
-          <pre className="bg-gray-900 border border-gray-800 rounded-md p-5 overflow-x-auto text-sm text-gray-100 font-mono"><code>{`<!-- AI Customer Support Widget -->
+      <div className="bg-slate-900 rounded-2xl p-1 shadow-xl overflow-hidden relative">
+        <div className="bg-slate-900 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-white tracking-tight">Embed Chat Widget</h3>
+              <p className="text-sm text-slate-400 font-medium">Paste this code right before the closing <code>&lt;/body&gt;</code> tag of your website.</p>
+            </div>
+            <button 
+              onClick={() => copyToClipboard(`<script src="https://cdn.my-platform.com/widget.js" data-widget-key="${company.widget_key}"></script>`, setCopiedSnippet)}
+              className="flex items-center space-x-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors border border-slate-700"
+            >
+              {copiedSnippet ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span>Copy Snippet</span>
+                </>
+              )}
+            </button>
+          </div>
+          
+          <pre className="bg-black/50 border border-slate-800 rounded-xl p-5 overflow-x-auto text-sm text-indigo-300 font-mono shadow-inner">
+            <code>
+{`<!-- AI Customer Support Widget -->
 <script
   src="https://cdn.my-platform.com/widget.js"
   data-widget-key="${company.widget_key}">
-</script>`}</code></pre>
-          <button 
-            onClick={() => navigator.clipboard.writeText(`<script src="https://cdn.my-platform.com/widget.js" data-widget-key="${company.widget_key}"></script>`)}
-            className="absolute top-4 right-4 px-3 py-1.5 bg-gray-700 text-white rounded-md text-xs hover:bg-gray-600 transition-colors font-medium">Copy Snippet</button>
+</script>`}
+            </code>
+          </pre>
         </div>
       </div>
     </div>
