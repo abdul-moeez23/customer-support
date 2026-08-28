@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MessageSquare, CheckCircle, Clock, Send, User, Bot, AlertCircle } from "lucide-react";
+import { MessageSquare, CheckCircle, Clock, Send, User, Bot, AlertCircle, Inbox } from "lucide-react";
 
 export default function InboxPage() {
   const [conversations, setConversations] = useState<any[]>([]);
@@ -46,11 +46,10 @@ export default function InboxPage() {
   const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText.trim() || !selectedConv) return;
-    
+
     const text = replyText;
     setReplyText("");
-    
-    // Optimistic UI update
+
     setMessages(prev => [...prev, { id: Date.now().toString(), role: "agent", content: text }]);
 
     try {
@@ -60,7 +59,7 @@ export default function InboxPage() {
         body: JSON.stringify({ content: text })
       });
       if (res.ok) {
-        fetchConversations(); // refresh statuses
+        fetchConversations();
       }
     } catch (err) {
       console.error("Failed to send reply", err);
@@ -76,108 +75,124 @@ export default function InboxPage() {
         body: JSON.stringify({ status: "resolved" })
       });
       fetchConversations();
-      setSelectedConv(prev => ({ ...prev, status: "resolved" }));
+      setSelectedConv((prev: any) => ({ ...prev, status: "resolved" }));
     } catch (err) {
       console.error("Failed to resolve", err);
     }
   };
 
+  const statusConfig: Record<string, { label: string; className: string }> = {
+    escalated: { label: "Escalated", className: "bg-red-50 text-red-700 border-red-200" },
+    resolved: { label: "Resolved", className: "bg-zinc-100 text-zinc-500 border-zinc-200" },
+    active: { label: "Active", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-medium animate-pulse">Loading inbox...</p>
+      <div className="flex items-center justify-center h-full">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-7 h-7 border-[3px] border-zinc-200 border-t-zinc-800 rounded-full animate-spin" />
+          <p className="text-sm text-zinc-500 font-medium">Loading inbox...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full bg-white">
-      {/* Sidebar for conversations list */}
-      <div className="w-80 flex-shrink-0 border-r border-slate-200 flex flex-col bg-slate-50">
-        <div className="p-4 border-b border-slate-200 bg-white">
-          <h2 className="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-indigo-600" />
-            Conversations
-          </h2>
+    <div className="flex h-full bg-zinc-50">
+      {/* Conversation list */}
+      <div className="w-72 flex-shrink-0 border-r border-zinc-200 flex flex-col bg-white">
+        <div className="px-4 py-3.5 border-b border-zinc-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-zinc-400" />
+            <h2 className="text-sm font-bold text-zinc-900">Conversations</h2>
+          </div>
+          {conversations.length > 0 && (
+            <span className="text-[11px] font-bold bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full">{conversations.length}</span>
+          )}
         </div>
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+
+        <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
-            <div className="p-8 text-sm text-slate-500 text-center flex flex-col items-center gap-3">
-              <CheckCircle className="w-8 h-8 text-slate-300" />
-              <span>Inbox zero. Great job!</span>
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+              <div className="w-12 h-12 bg-zinc-50 border border-zinc-200 rounded-full flex items-center justify-center mb-3">
+                <Inbox className="w-5 h-5 text-zinc-300" />
+              </div>
+              <p className="text-sm font-semibold text-zinc-600">All caught up!</p>
+              <p className="text-xs text-zinc-400 mt-1">No conversations yet.</p>
             </div>
           ) : (
-            conversations.map(conv => (
-              <button
-                key={conv.id}
-                onClick={() => selectConversation(conv)}
-                className={`w-full text-left p-4 transition-colors relative group ${selectedConv?.id === conv.id ? 'bg-indigo-50' : 'hover:bg-slate-100 bg-white'}`}
-              >
-                {selectedConv?.id === conv.id && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-600"></div>
-                )}
-                <div className="flex justify-between items-start mb-2">
-                  <span className={`text-sm font-bold truncate ${selectedConv?.id === conv.id ? 'text-indigo-900' : 'text-slate-900'}`}>
-                    Session {conv.session_id.substring(0, 8)}...
-                  </span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 ${
-                    conv.status === 'escalated' ? 'bg-red-100 text-red-700 border border-red-200' : 
-                    conv.status === 'resolved' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                  }`}>
-                    {conv.status === 'escalated' && <AlertCircle className="w-3 h-3" />}
-                    {conv.status === 'resolved' && <CheckCircle className="w-3 h-3" />}
-                    {conv.status === 'active' && <Clock className="w-3 h-3" />}
-                    {conv.status}
-                  </span>
-                </div>
-                <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" />
-                  {new Date(conv.updated_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                </div>
-              </button>
-            ))
+            conversations.map(conv => {
+              const isSelected = selectedConv?.id === conv.id;
+              const status = statusConfig[conv.status] || statusConfig.active;
+              return (
+                <button
+                  key={conv.id}
+                  onClick={() => selectConversation(conv)}
+                  className={`w-full text-left px-4 py-3.5 border-b border-zinc-100 transition-colors relative cursor-pointer ${
+                    isSelected ? "bg-zinc-50" : "hover:bg-zinc-50/80"
+                  }`}
+                >
+                  {isSelected && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-zinc-800" />}
+                  <div className="flex justify-between items-start gap-2 mb-1.5">
+                    <span className="text-xs font-bold text-zinc-900 truncate">
+                      Session {conv.session_id.substring(0, 8)}...
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border flex-shrink-0 ${status.className}`}>
+                      {status.label}
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-medium text-zinc-400 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {new Date(conv.updated_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
       </div>
 
-      {/* Main chat view */}
-      <div className="flex-1 flex flex-col bg-white relative">
+      {/* Chat view */}
+      <div className="flex-1 flex flex-col bg-white">
         {selectedConv ? (
           <>
-            <div className="px-6 py-4 border-b border-slate-200 bg-white flex justify-between items-center shadow-sm z-10">
+            {/* Chat header */}
+            <div className="px-6 py-3.5 border-b border-zinc-100 flex justify-between items-center bg-white">
               <div>
-                <h3 className="font-bold text-slate-900 text-lg">Session Details</h3>
-                <p className="text-xs font-medium text-slate-500 font-mono mt-0.5">ID: {selectedConv.session_id}</p>
+                <h3 className="text-sm font-bold text-zinc-900">Session Details</h3>
+                <p className="text-[11px] font-mono text-zinc-400 mt-0.5">{selectedConv.session_id}</p>
               </div>
-              {selectedConv.status !== 'resolved' && (
-                <button 
+              {selectedConv.status !== "resolved" && (
+                <button
                   onClick={handleResolve}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-lg transition-colors active:scale-[0.98] border border-slate-200"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 text-xs font-bold rounded-lg transition-colors border border-zinc-200 hover:border-zinc-300 cursor-pointer"
                 >
-                  <CheckCircle className="w-4 h-4" />
-                  Mark as Resolved
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  Mark Resolved
                 </button>
               )}
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-zinc-50/50">
               {messages.map((msg, idx) => {
                 const isUser = msg.role === "user";
                 const isAgent = msg.role === "agent";
                 return (
-                  <div key={idx} className={`flex flex-col ${isUser ? 'items-start' : 'items-end'}`}>
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-1.5 px-1">
-                      {isUser && <User className="w-3.5 h-3.5" />}
-                      {!isUser && isAgent && <MessageSquare className="w-3.5 h-3.5" />}
-                      {!isUser && !isAgent && <Bot className="w-3.5 h-3.5" />}
+                  <div key={idx} className={`flex flex-col ${isUser ? "items-start" : "items-end"}`}>
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-400 mb-1.5 px-1">
+                      {isUser && <User className="w-3 h-3" />}
+                      {!isUser && isAgent && <MessageSquare className="w-3 h-3" />}
+                      {!isUser && !isAgent && <Bot className="w-3 h-3" />}
                       <span>{isUser ? "Customer" : isAgent ? "Human Agent" : "AI Bot"}</span>
                     </div>
-                    <div className={`max-w-[75%] p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                      isUser ? 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm' : 
-                      isAgent ? 'bg-indigo-600 text-white rounded-tr-sm shadow-indigo-200' : 'bg-slate-200 text-slate-800 rounded-tr-sm border border-slate-300'
+                    <div className={`max-w-[72%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                      isUser
+                        ? "bg-white border border-zinc-200 text-zinc-800 rounded-tl-sm shadow-sm"
+                        : isAgent
+                        ? "bg-zinc-900 text-white rounded-tr-sm"
+                        : "bg-zinc-100 text-zinc-700 rounded-tr-sm border border-zinc-200"
                     }`}>
                       {msg.content}
                     </div>
@@ -186,39 +201,42 @@ export default function InboxPage() {
               })}
             </div>
 
-            <div className="p-4 bg-white border-t border-slate-200">
-              {selectedConv.status === 'resolved' ? (
-                <div className="text-center text-sm font-medium text-slate-500 py-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <CheckCircle className="w-5 h-5 mx-auto mb-2 text-slate-400" />
-                  This conversation has been resolved and closed.
+            {/* Reply bar */}
+            <div className="px-5 py-4 bg-white border-t border-zinc-100">
+              {selectedConv.status === "resolved" ? (
+                <div className="flex items-center justify-center gap-2 text-xs font-medium text-zinc-400 py-2">
+                  <CheckCircle className="w-4 h-4 text-zinc-300" />
+                  This conversation is resolved and closed.
                 </div>
               ) : (
-                <form onSubmit={handleReply} className="flex gap-3">
-                  <input 
-                    type="text" 
+                <form onSubmit={handleReply} className="flex items-center gap-3">
+                  <input
+                    type="text"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
-                    placeholder="Type your reply to the customer..."
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
+                    placeholder="Reply to customer..."
+                    className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all placeholder:text-zinc-400"
+                    aria-label="Reply message"
                   />
-                  <button 
+                  <button
                     type="submit"
                     disabled={!replyText.trim()}
-                    className="flex items-center justify-center w-12 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all disabled:opacity-50 active:scale-[0.95] shadow-sm"
+                    className="flex items-center justify-center w-10 h-10 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl transition-all disabled:opacity-40 active:scale-[0.95] cursor-pointer flex-shrink-0"
+                    aria-label="Send reply"
                   >
-                    <Send className="w-5 h-5 ml-1" />
+                    <Send className="w-4 h-4 ml-0.5" />
                   </button>
                 </form>
               )}
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 text-center bg-slate-50/50">
-            <div className="w-16 h-16 bg-white border border-slate-200 rounded-full flex items-center justify-center shadow-sm mb-4">
-              <MessageSquare className="w-8 h-8 text-slate-300" />
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-14 h-14 bg-zinc-50 border border-zinc-200 rounded-2xl flex items-center justify-center mb-4">
+              <MessageSquare className="w-6 h-6 text-zinc-300" />
             </div>
-            <p className="text-lg font-bold text-slate-600">No conversation selected</p>
-            <p className="text-sm font-medium mt-1">Select a conversation from the sidebar to view history and reply.</p>
+            <p className="text-sm font-bold text-zinc-600">No conversation selected</p>
+            <p className="text-xs text-zinc-400 mt-1.5 max-w-xs">Pick a conversation from the list to view the message history and send replies.</p>
           </div>
         )}
       </div>

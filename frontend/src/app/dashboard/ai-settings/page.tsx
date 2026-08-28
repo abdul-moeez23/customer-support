@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bot, Save, CheckCircle2, AlertCircle, ChevronDown } from "lucide-react";
+import { Bot, Save, CheckCircle2, AlertCircle, ChevronDown, Sparkles } from "lucide-react";
 
 export default function AISettingsPage() {
   const [provider, setProvider] = useState("openai");
@@ -52,11 +52,11 @@ export default function AISettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      
+
       if (res.ok) {
         setMessage({ text: "Configuration saved successfully!", type: "success" });
-        setApiKey(""); // clear field after save for security
-        fetchConfig(); // reload state
+        setApiKey("");
+        fetchConfig();
       } else {
         setMessage({ text: "Failed to save configuration.", type: "error" });
       }
@@ -68,89 +68,122 @@ export default function AISettingsPage() {
     }
   };
 
+  const providerModels: Record<string, string> = {
+    openai: "e.g. gpt-4o, gpt-4-turbo, gpt-3.5-turbo",
+    anthropic: "e.g. claude-3-5-sonnet-20241022",
+    gemini: "e.g. gemini-1.5-pro, gemini-1.5-flash",
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-medium animate-pulse">Loading settings...</p>
+      <div className="flex items-center justify-center h-full">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-7 h-7 border-[3px] border-zinc-200 border-t-zinc-800 rounded-full animate-spin" />
+          <p className="text-sm text-zinc-500 font-medium">Loading settings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-8">
-      <header className="mb-8">
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-            <Bot className="w-6 h-6" />
-          </div>
-          AI Provider Settings
-        </h1>
-        <p className="text-slate-500 mt-2 font-medium">Configure the brain behind your AI Support Platform.</p>
-      </header>
-      
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-        <form onSubmit={handleSave} className="space-y-6">
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">LLM Provider</label>
-              <div className="relative">
-                <select 
-                  value={provider} 
-                  onChange={e => setProvider(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-4 pr-10 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow appearance-none"
-                >
-                  <option value="openai">OpenAI (Recommended)</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="gemini">Google Gemini</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="pt-2">
+        <div className="flex items-center gap-2.5 mb-1">
+          <Bot className="w-5 h-5 text-zinc-400" />
+          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">AI Settings</h1>
+        </div>
+        <p className="text-sm text-zinc-500 ml-7.5">Configure the language model powering your support platform.</p>
+      </div>
+
+      {/* Form card */}
+      <div className="bg-white border border-zinc-200 rounded-xl shadow-sm">
+        <form onSubmit={handleSave}>
+          <div className="p-6 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Provider */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="provider">
+                  LLM Provider
+                </label>
+                <div className="relative">
+                  <select
+                    id="provider"
+                    value={provider}
+                    onChange={e => setProvider(e.target.value)}
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg pl-3.5 pr-10 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="gemini">Google Gemini</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Model */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="model">
+                  Model <span className="text-zinc-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  id="model"
+                  type="text"
+                  value={model}
+                  onChange={e => setModel(e.target.value)}
+                  placeholder={providerModels[provider]}
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all placeholder:text-zinc-400"
+                />
               </div>
             </div>
 
+            {/* API Key */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Custom Model Name</label>
-              <input 
-                type="text" 
-                value={model}
-                onChange={e => setModel(e.target.value)}
-                placeholder="e.g. gpt-4, claude-3-opus-20240229"
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow placeholder:text-slate-400"
+              <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="api_key">
+                API Key
+                {hasApiKey && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                    <CheckCircle2 className="w-3 h-3" /> Configured
+                  </span>
+                )}
+              </label>
+              <input
+                id="api_key"
+                type="password"
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder={hasApiKey ? "Enter new key to replace existing..." : "sk-..."}
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all placeholder:text-zinc-400"
               />
-              <p className="text-xs text-slate-500 mt-2 font-medium">Leave blank to use the provider's default optimal model.</p>
+              <p className="text-xs text-zinc-400 mt-1.5">Keys are encrypted at rest and never exposed in responses.</p>
             </div>
+
+            {message.text && (
+              <div className={`flex items-start gap-2.5 text-sm p-3.5 rounded-lg border ${
+                message.type === "success"
+                  ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                  : "bg-red-50 border-red-100 text-red-700"
+              }`}>
+                {message.type === "success"
+                  ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-500 mt-0.5" />
+                  : <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500 mt-0.5" />
+                }
+                <span>{message.text}</span>
+              </div>
+            )}
           </div>
 
-          <div className="pt-2">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">API Key</label>
-            <input 
-              type="password" 
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder={hasApiKey ? "•••••••••••••••• (Key is already configured)" : "Enter your API key..."}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow placeholder:text-slate-400"
-            />
-            <p className="text-xs text-slate-500 mt-2 font-medium">Provide your own API key to bypass system limits. Keys are stored encrypted at rest.</p>
-          </div>
-
-          {message.text && (
-            <div className={`p-4 rounded-xl text-sm font-medium flex items-start gap-3 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-              {message.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" /> : <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500" />}
-              <span>{message.text}</span>
-            </div>
-          )}
-
-          <div className="pt-6 border-t border-slate-100 flex justify-end">
-            <button 
-              type="submit" 
+          <div className="px-6 py-4 border-t border-zinc-100 flex justify-end bg-zinc-50/50 rounded-b-xl">
+            <button
+              type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-all disabled:opacity-50 active:scale-[0.98] shadow-sm"
+              className="flex items-center gap-2 px-5 py-2 bg-zinc-900 text-white rounded-lg text-sm font-semibold hover:bg-zinc-800 disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer"
             >
               {saving ? (
-                <span>Saving...</span>
+                <>
+                  <div className="w-4 h-4 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+                  <span>Saving...</span>
+                </>
               ) : (
                 <>
                   <Save className="w-4 h-4" />
@@ -159,8 +192,20 @@ export default function AISettingsPage() {
               )}
             </button>
           </div>
-
         </form>
+      </div>
+
+      {/* Tips */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-sm font-bold text-zinc-900">Recommendations</h2>
+        </div>
+        <ul className="space-y-2 text-sm text-zinc-600">
+          <li className="flex items-start gap-2"><span className="text-zinc-300 mt-0.5">—</span> <strong className="text-zinc-800">OpenAI GPT-4o</strong> is recommended for best quality responses.</li>
+          <li className="flex items-start gap-2"><span className="text-zinc-300 mt-0.5">—</span> Leave the model field blank to use each provider&apos;s latest default.</li>
+          <li className="flex items-start gap-2"><span className="text-zinc-300 mt-0.5">—</span> Your API key is used only for your company&apos;s workspace.</li>
+        </ul>
       </div>
     </div>
   );

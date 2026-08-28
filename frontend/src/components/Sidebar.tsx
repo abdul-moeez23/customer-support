@@ -11,8 +11,8 @@ import {
   Link as LinkIcon, 
   Settings, 
   Bot,
-  Plus,
-  LogOut
+  LogOut,
+  Zap
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -39,65 +39,75 @@ export default function Sidebar() {
     { name: 'Knowledge Base', href: '/dashboard/knowledge-base', icon: BookOpen },
     { name: 'DB Connections', href: '/dashboard/db-connections', icon: Database },
     { name: 'API Connections', href: '/dashboard/api-connections', icon: LinkIcon },
-    { name: 'Widget Customization', href: '/dashboard/widget-settings', icon: Settings },
+    { name: 'Widget Settings', href: '/dashboard/widget-settings', icon: Settings },
     { name: 'AI Settings', href: '/dashboard/ai-settings', icon: Bot },
   ];
 
   return (
-    <aside className="w-72 bg-white border-r border-slate-200 h-screen flex flex-col shadow-sm relative z-20">
-      <div className="p-6 flex items-center space-x-3">
-        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-200">
-          <span className="text-white font-bold text-xl">O</span>
+    <aside className="w-64 bg-white border-r border-zinc-100 h-screen flex flex-col relative z-20">
+      {/* Logo */}
+      <div className="px-5 pt-6 pb-4 flex items-center gap-3">
+        <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center flex-shrink-0">
+          <span className="text-white font-bold text-sm">O</span>
         </div>
         <div>
-          <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">Orchestrator</h1>
-          <p className="text-xs font-medium text-slate-500">AI Support Platform</p>
+          <h1 className="text-sm font-bold text-zinc-900 tracking-tight leading-none">Orchestrator</h1>
+          <p className="text-[11px] font-medium text-zinc-400 mt-0.5">AI Support Platform</p>
         </div>
       </div>
-      
+
+      {/* New integration CTA */}
       <div className="px-4 pb-4">
-        <button className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-all duration-200 shadow-sm active:scale-[0.98]">
-          <Plus className="w-4 h-4" />
+        <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 text-sm font-semibold rounded-lg border border-zinc-200 hover:border-zinc-300 transition-all duration-150 cursor-pointer">
+          <Zap className="w-3.5 h-3.5" />
           <span>New Integration</span>
         </button>
       </div>
 
-      <nav className="flex-1 px-4 py-2 space-y-1.5 overflow-y-auto">
+      {/* Section label */}
+      <div className="px-4 mb-1">
+        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Navigation</p>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto pb-4">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
           return (
             <Link 
               key={item.href}
-              href={item.href} 
-              className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg font-medium transition-all duration-200 group ${
+              href={item.href}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative ${
                 isActive 
-                  ? 'bg-indigo-50 text-indigo-700' 
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-zinc-900 text-white' 
+                  : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
               }`}
             >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
-              <span className="text-sm">{item.name}</span>
+              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-600'}`} />
+              <span>{item.name}</span>
             </Link>
           );
         })}
       </nav>
-      
-      <div className="px-4 pt-4 pb-12 border-t border-slate-200 mt-auto">
-        <div 
+
+      {/* User / Logout */}
+      <div className="px-4 pt-3 pb-6 border-t border-zinc-100">
+        <button
           onClick={handleLogout}
-          className="p-3 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group flex items-center space-x-3 shadow-sm"
-          title="Click to logout"
+          className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-zinc-50 transition-colors cursor-pointer group"
+          title="Sign out"
+          aria-label="Sign out"
         >
-          <div className="w-10 h-10 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold shadow-sm">
+          <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-700 text-sm font-bold flex-shrink-0">
             {userEmail ? userEmail.charAt(0).toUpperCase() : "U"}
           </div>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-semibold text-slate-900 truncate">Dashboard User</p>
-            <p className="text-xs text-slate-500 truncate">{userEmail}</p>
+          <div className="flex-1 text-left overflow-hidden">
+            <p className="text-xs font-semibold text-zinc-900 truncate leading-tight">Dashboard User</p>
+            <p className="text-[11px] text-zinc-400 truncate mt-0.5">{userEmail}</p>
           </div>
-          <LogOut className="w-4 h-4 text-slate-400 group-hover:text-red-500 transition-colors" />
-        </div>
+          <LogOut className="w-3.5 h-3.5 text-zinc-300 group-hover:text-red-400 transition-colors flex-shrink-0" />
+        </button>
       </div>
     </aside>
   );

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, UploadCloud, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { BookOpen, UploadCloud, FileText, CheckCircle2, AlertCircle, X } from "lucide-react";
 
 export default function KnowledgeBasePage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
+  const [dragOver, setDragOver] = useState(false);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,7 +15,7 @@ export default function KnowledgeBasePage() {
 
     const companyId = localStorage.getItem("company_id");
     if (!companyId) {
-      setMessage({ text: "Error: No company ID found. Please sign up or log in again.", type: "error" });
+      setMessage({ text: "No company ID found. Please sign in again.", type: "error" });
       return;
     }
 
@@ -32,13 +33,16 @@ export default function KnowledgeBasePage() {
       });
 
       const data = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(data.detail || "Upload failed");
       }
 
-      setMessage({ text: `Success! "${data.filename}" was uploaded, processed, and securely stored as ${data.chunks_processed} semantic chunks in your isolated vector database.`, type: "success" });
-      setFile(null); // Reset file input
+      setMessage({
+        text: `"${data.filename}" was processed and stored as ${data.chunks_processed} semantic chunks in your knowledge base.`,
+        type: "success",
+      });
+      setFile(null);
     } catch (err: any) {
       setMessage({ text: err.message, type: "error" });
     } finally {
@@ -47,77 +51,119 @@ export default function KnowledgeBasePage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-8">
-      <header>
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-            <BookOpen className="w-6 h-6" />
-          </div>
-          Knowledge Base
-        </h1>
-        <p className="text-slate-500 mt-2 font-medium">Upload your company's PDFs or Text documents. They will be securely processed and added to your isolated AI brain.</p>
-      </header>
+    <div className="p-6 max-w-3xl mx-auto space-y-6">
+      {/* Page header */}
+      <div className="pt-2">
+        <div className="flex items-center gap-2.5 mb-1">
+          <BookOpen className="w-5 h-5 text-zinc-400" />
+          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Knowledge Base</h1>
+        </div>
+        <p className="text-sm text-zinc-500 ml-7.5">Upload documents to train your AI assistant.</p>
+      </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-        <form onSubmit={handleUpload} className="space-y-6">
-          <div className="flex justify-center px-6 pt-10 pb-12 border-2 border-slate-300 border-dashed rounded-2xl hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors group relative cursor-pointer">
-            <input 
-              type="file" 
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+      {/* Upload card */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
+        <h2 className="text-sm font-bold text-zinc-900 mb-4">Upload Document</h2>
+        <form onSubmit={handleUpload} className="space-y-4">
+          {/* Drop zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const dropped = e.dataTransfer.files[0];
+              if (dropped) setFile(dropped);
+            }}
+            className={`relative flex flex-col items-center justify-center px-6 py-12 border-2 border-dashed rounded-xl transition-colors cursor-pointer ${
+              dragOver
+                ? "border-zinc-500 bg-zinc-50"
+                : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50/50"
+            }`}
+          >
+            <input
+              type="file"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               accept=".pdf,.txt"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
+              aria-label="Upload file"
             />
-            <div className="space-y-2 text-center pointer-events-none">
-              <UploadCloud className="mx-auto h-12 w-12 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-              <div className="flex text-sm text-slate-600 justify-center font-medium">
-                <span className="text-indigo-600 font-bold group-hover:text-indigo-700">Upload a file</span>
-                <span className="pl-1">or drag and drop</span>
-              </div>
-              <p className="text-xs text-slate-500 font-medium">
-                PDF or TXT formats supported (Max 10MB)
-              </p>
-            </div>
+            <UploadCloud className={`w-10 h-10 mb-3 transition-colors ${dragOver ? "text-zinc-700" : "text-zinc-300"}`} />
+            <p className="text-sm font-semibold text-zinc-700">
+              Drop your file here, or <span className="text-zinc-900 underline underline-offset-2">browse</span>
+            </p>
+            <p className="text-xs text-zinc-400 mt-1.5">PDF or TXT &mdash; max 10MB</p>
           </div>
-          
+
+          {/* Selected file */}
           {file && (
-            <div className="flex items-center gap-3 text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-200 font-medium shadow-sm">
-              <FileText className="w-5 h-5 text-indigo-500" />
-              <div className="flex-1 truncate">
-                {file.name}
-              </div>
-              <div className="text-xs text-slate-500">
-                {(file.size / 1024 / 1024).toFixed(2)} MB
-              </div>
+            <div className="flex items-center gap-3 text-sm bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-lg">
+              <FileText className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+              <span className="flex-1 truncate font-medium text-zinc-700">{file.name}</span>
+              <span className="text-xs text-zinc-400 flex-shrink-0">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+              <button
+                type="button"
+                onClick={() => setFile(null)}
+                className="text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer"
+                aria-label="Remove file"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           )}
 
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={!file || uploading}
-              className="w-full inline-flex justify-center items-center gap-2 py-3 px-4 rounded-lg shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none disabled:opacity-50 transition-all active:scale-[0.98]"
-            >
-              {uploading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-indigo-200 border-t-white rounded-full animate-spin"></div>
-                  <span>Processing Document...</span>
-                </>
-              ) : (
-                <>
-                  <UploadCloud className="w-4 h-4" />
-                  <span>Upload to Knowledge Base</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+          <button
+            type="submit"
+            disabled={!file || uploading}
+            className="w-full flex justify-center items-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.98] cursor-pointer"
+          >
+            {uploading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <UploadCloud className="w-4 h-4" />
+                <span>Upload to Knowledge Base</span>
+              </>
+            )}
+          </button>
 
-        {message.text && (
-          <div className={`mt-6 p-4 rounded-xl font-medium text-sm flex items-start gap-3 ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
-            {message.type === 'error' ? <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500" /> : <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" />}
-            <span className="leading-relaxed">{message.text}</span>
-          </div>
-        )}
+          {message.text && (
+            <div className={`flex items-start gap-2.5 text-sm p-3.5 rounded-lg border ${
+              message.type === "error"
+                ? "bg-red-50 border-red-100 text-red-700"
+                : "bg-emerald-50 border-emerald-100 text-emerald-700"
+            }`}>
+              {message.type === "error"
+                ? <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500 mt-0.5" />
+                : <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-500 mt-0.5" />
+              }
+              <span className="leading-relaxed">{message.text}</span>
+            </div>
+          )}
+        </form>
+      </div>
+
+      {/* Info panel */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-6">
+        <h2 className="text-sm font-bold text-zinc-900 mb-3">How it works</h2>
+        <ol className="space-y-2.5">
+          {[
+            "Your document is chunked into semantic segments.",
+            "Each chunk is embedded as a vector and stored in your isolated database.",
+            "When a customer asks a question, the AI searches your knowledge base first.",
+            "Answers are grounded in your own content — not generic AI responses.",
+          ].map((step, i) => (
+            <li key={i} className="flex items-start gap-3 text-sm text-zinc-600">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-100 text-zinc-500 text-[11px] font-bold flex items-center justify-center mt-0.5">
+                {i + 1}
+              </span>
+              {step}
+            </li>
+          ))}
+        </ol>
       </div>
     </div>
   );

@@ -22,9 +22,7 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
@@ -45,89 +43,87 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 z-0 pointer-events-none flex justify-center">
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-indigo-500/10 blur-3xl"></div>
-        <div className="absolute top-1/2 -right-32 w-96 h-96 rounded-full bg-violet-500/10 blur-3xl"></div>
-      </div>
+    <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      {/* Subtle background grid */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#f4f4f580_1px,transparent_1px),linear-gradient(to_bottom,#f4f4f580_1px,transparent_1px)] bg-[size:48px_48px] pointer-events-none" />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 flex flex-col items-center">
-        <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200 mb-6">
-          <span className="text-white font-bold text-2xl">O</span>
+      <div className="relative z-10 w-full max-w-sm">
+        {/* Logo mark */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center shadow-sm mb-5">
+            <span className="text-white font-bold text-lg">O</span>
+          </div>
+          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Welcome back</h1>
+          <p className="mt-1.5 text-sm text-zinc-500">Sign in to your Orchestrator account</p>
         </div>
-        <h2 className="text-center text-3xl font-extrabold text-slate-900 tracking-tight">
-          Welcome back
-        </h2>
-        <p className="mt-2 text-center text-sm text-slate-600">
-          Sign in to your Orchestrator account
-        </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="bg-white py-8 px-6 shadow-xl shadow-slate-200/50 sm:rounded-2xl border border-slate-100 sm:px-10">
-          <form className="space-y-5" onSubmit={handleSubmit}>
+        {/* Card */}
+        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-8">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
-              <div className="mt-1">
-                <input
-                  name="email"
-                  type="email"
-                  required
-                  className="appearance-none block w-full px-4 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm text-slate-900 transition-shadow"
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="admin@company.com"
-                />
-              </div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="email">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                className="block w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all"
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="you@company.com"
+              />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-              <div className="mt-1">
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  className="appearance-none block w-full px-4 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm text-slate-900 transition-shadow"
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="••••••••"
-                />
-              </div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="password">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                className="block w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all"
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="••••••••"
+              />
             </div>
 
             {error && (
-              <div className="flex items-start space-x-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">
-                <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500" />
+              <div className="flex items-start gap-2.5 text-sm bg-red-50 border border-red-100 text-red-700 p-3 rounded-lg">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center items-center space-x-2 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 active:scale-[0.98]"
-              >
-                {loading ? (
-                  <span>Logging in...</span>
-                ) : (
-                  <>
-                    <span>Sign in</span>
-                    <LogIn className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex justify-center items-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-zinc-900 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-[0.98] mt-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-4 h-4" />
+                  <span>Sign in</span>
+                </>
+              )}
+            </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="text-sm text-center">
-              <span className="text-slate-500">Don't have an account? </span>
-              <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500 transition-colors inline-flex items-center space-x-1 group">
-                <span>Create one</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </div>
+          <div className="mt-6 pt-6 border-t border-zinc-100 text-center text-sm">
+            <span className="text-zinc-500">Don&apos;t have an account? </span>
+            <Link href="/signup" className="font-semibold text-zinc-900 hover:text-zinc-700 transition-colors inline-flex items-center gap-1 group">
+              Create one
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
           </div>
         </div>
       </div>
