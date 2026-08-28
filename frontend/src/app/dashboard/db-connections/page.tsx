@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Database, ShieldCheck, Server, AlertCircle, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Database, ShieldCheck, Server, AlertCircle, CheckCircle2 } from "lucide-react";
+import { CustomSelect } from "@/components/CustomSelect";
 
 export default function DBConnectionsPage() {
   const [formData, setFormData] = useState({
@@ -95,16 +96,16 @@ export default function DBConnectionsPage() {
               <div>
                 <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="db_type">Type</label>
                 <div className="relative">
-                  <select
+                  <CustomSelect
                     id="db_type"
-                    className={inputClass + " pl-3.5 pr-10 appearance-none cursor-pointer"}
-                    onChange={(e) => setFormData({ ...formData, db_type: e.target.value })}
                     value={formData.db_type}
-                  >
-                    <option value="postgres">PostgreSQL</option>
-                    <option value="mysql">MySQL</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+                    onChange={(val) => setFormData({ ...formData, db_type: val })}
+                    options={[
+                      { value: "postgres", label: "PostgreSQL" },
+                      { value: "mysql", label: "MySQL" },
+                    ]}
+                    aria-label="Database type"
+                  />
                 </div>
               </div>
               <div>

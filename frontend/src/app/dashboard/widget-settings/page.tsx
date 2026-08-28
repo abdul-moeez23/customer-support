@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Save, CheckCircle2, AlertCircle, ChevronDown, Palette, Eye } from "lucide-react";
+import { Settings, Save, CheckCircle2, AlertCircle, Palette, Eye } from "lucide-react";
+import { CustomSelect } from "@/components/CustomSelect";
 
 export default function WidgetSettingsPage() {
   const [config, setConfig] = useState<any>({
@@ -147,16 +148,16 @@ export default function WidgetSettingsPage() {
                     <div>
                       <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="position">Position</label>
                       <div className="relative">
-                        <select
+                        <CustomSelect
                           id="position"
                           value={config.position}
-                          onChange={e => handleChange("position", e.target.value)}
-                          className={inputClass + " pr-10 appearance-none cursor-pointer"}
-                        >
-                          <option value="bottom-right">Bottom Right</option>
-                          <option value="bottom-left">Bottom Left</option>
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+                          onChange={(val) => handleChange("position", val)}
+                          options={[
+                            { value: "bottom-right", label: "Bottom Right" },
+                            { value: "bottom-left", label: "Bottom Left" },
+                          ]}
+                          aria-label="Widget position"
+                        />
                       </div>
                     </div>
                   </div>

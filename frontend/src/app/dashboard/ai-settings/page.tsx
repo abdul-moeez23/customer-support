@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bot, Save, CheckCircle2, AlertCircle, ChevronDown, Sparkles } from "lucide-react";
+import { Bot, Save, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
+import { CustomSelect } from "@/components/CustomSelect";
 
 export default function AISettingsPage() {
   const [provider, setProvider] = useState("openai");
@@ -107,17 +108,17 @@ export default function AISettingsPage() {
                   LLM Provider
                 </label>
                 <div className="relative">
-                  <select
+                  <CustomSelect
                     id="provider"
                     value={provider}
-                    onChange={e => setProvider(e.target.value)}
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg pl-3.5 pr-10 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="gemini">Google Gemini</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+                    onChange={(val) => setProvider(val)}
+                    options={[
+                      { value: "openai", label: "OpenAI" },
+                      { value: "anthropic", label: "Anthropic" },
+                      { value: "gemini", label: "Google Gemini" },
+                    ]}
+                    aria-label="LLM Provider"
+                  />
                 </div>
               </div>
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Link as LinkIcon, Plus, Save, Server, Code2, AlertCircle, CheckCircle2, ChevronDown, Trash2 } from "lucide-react";
+import { Link as LinkIcon, Plus, Save, Server, Code2, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
+import { CustomSelect } from "@/components/CustomSelect";
 
 export default function APIConnectionsPage() {
   const [formData, setFormData] = useState({
@@ -94,17 +95,17 @@ export default function APIConnectionsPage() {
               <div>
                 <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="auth_type">Auth Type</label>
                 <div className="relative">
-                  <select
+                  <CustomSelect
                     id="auth_type"
-                    className={inputClass + " pl-3.5 pr-10 appearance-none cursor-pointer"}
-                    onChange={(e) => setFormData({ ...formData, auth_type: e.target.value })}
                     value={formData.auth_type}
-                  >
-                    <option value="bearer">Bearer Token</option>
-                    <option value="basic">Basic Auth</option>
-                    <option value="header">Custom Header</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+                    onChange={(val) => setFormData({ ...formData, auth_type: val })}
+                    options={[
+                      { value: "bearer", label: "Bearer Token" },
+                      { value: "basic", label: "Basic Auth" },
+                      { value: "header", label: "Custom Header" },
+                    ]}
+                    aria-label="Auth type"
+                  />
                 </div>
               </div>
               <div>
@@ -171,23 +172,23 @@ export default function APIConnectionsPage() {
               {endpoints.map((ep, idx) => (
                 <div key={idx} className="border border-zinc-100 rounded-xl p-3.5 bg-zinc-50/50 space-y-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="relative flex-shrink-0">
-                      <select
-                        className={`pl-2.5 pr-8 py-1.5 bg-white border rounded-lg text-xs font-bold appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-zinc-900 ${methodColors[ep.method] || "border-zinc-200 text-zinc-700"}`}
+                    <div className="flex-shrink-0 w-28">
+                      <CustomSelect
                         value={ep.method}
-                        onChange={(e) => {
+                        onChange={(val) => {
                           const newEps = [...endpoints];
-                          newEps[idx].method = e.target.value;
+                          newEps[idx].method = val;
                           setEndpoints(newEps);
                         }}
+                        options={[
+                          { value: "GET", label: "GET" },
+                          { value: "POST", label: "POST" },
+                          { value: "PUT", label: "PUT" },
+                          { value: "DELETE", label: "DELETE" },
+                        ]}
+                        size="sm"
                         aria-label="HTTP Method"
-                      >
-                        <option>GET</option>
-                        <option>POST</option>
-                        <option>PUT</option>
-                        <option>DELETE</option>
-                      </select>
-                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none opacity-60" />
+                      />
                     </div>
                     <input
                       type="text"
