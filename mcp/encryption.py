@@ -13,12 +13,8 @@ load_dotenv()
 
 key_str = os.getenv("ENCRYPTION_KEY")
 if not key_str:
-    # Fallback for local dev — in production this MUST be set
     key_str = Fernet.generate_key().decode()
-    print(
-        "WARNING: ENCRYPTION_KEY not set in environment. "
-        "Using a temporary key — encrypted credentials cannot be decrypted correctly."
-    )
+    print("WARNING: Using auto-generated fallback encryption key.")
 
 cipher_suite = Fernet(key_str.encode())
 

@@ -29,7 +29,7 @@ export default function DBConnectionsPage() {
     if (!companyId) return;
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/connections/database`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/connections/database`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...formData, company_id: companyId })
@@ -40,7 +40,7 @@ export default function DBConnectionsPage() {
 
       setConnectionId(data.id);
 
-      const schemaRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/connections/database/${data.id}/schema`);
+      const schemaRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/connections/database/${data.id}/schema`);
       const schemaData = await schemaRes.json();
       if (!schemaRes.ok) throw new Error(schemaData.detail);
 
@@ -57,7 +57,7 @@ export default function DBConnectionsPage() {
     if (!connectionId) return;
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/connections/database/allowed-tables`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/connections/database/allowed-tables`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ connection_id: connectionId, tables: selectedTables })

@@ -7,8 +7,9 @@ load_dotenv()
 # We look for ENCRYPTION_KEY in .env, otherwise generate a random one for dev
 key_str = os.getenv("ENCRYPTION_KEY")
 if not key_str:
+    # Generate on the fly, but it might be lost on full restart. It's guaranteed valid though.
     key_str = Fernet.generate_key().decode()
-    print("WARNING: Using auto-generated encryption key. Data will be lost on restart if not saved in .env")
+    print("WARNING: Using auto-generated fallback encryption key.")
 
 cipher_suite = Fernet(key_str.encode())
 

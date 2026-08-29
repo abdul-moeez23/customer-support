@@ -22,7 +22,8 @@ export default function AISettingsPage() {
     if (!companyId) return;
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/llm-config/${companyId}`);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/llm-config/${companyId}`);
       if (res.ok) {
         const data = await res.json();
         setProvider(data.provider);
@@ -48,7 +49,8 @@ export default function AISettingsPage() {
         payload.api_key = apiKey;
       }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/llm-config`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/llm-config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

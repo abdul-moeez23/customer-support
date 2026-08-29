@@ -4,7 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base, get_db
 import models, schemas
 from auth import get_password_hash
-from rag_pipeline import process_and_store_document, init_qdrant
+from rag_pipeline import init_qdrant
+from worker import process_document_task
+from storage import upload_to_minio
 
 # Create database tables (now managed by Alembic)
 # Base.metadata.create_all(bind=engine)
@@ -22,7 +24,7 @@ def on_startup():
 # Allow CORS for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -112,14 +114,49 @@ async def upload_document(
          
     try:
         file_bytes = await file.read()
-        chunks_count = process_and_store_document(file_bytes, file.filename, company_id)
+        
+        # Create DB record in 'pending' state
+        new_doc = models.Document(
+            company_id=company_id,
+            filename=file.filename,
+            status='pending'
+        )
+        db.add(new_doc)
+        db.commit()
+        db.refresh(new_doc)
+        
+        # Upload encrypted file to MinIO
+        object_key = upload_to_minio(new_doc.id, file_bytes)
+        
+        # Update DB record with MinIO URL/key and set to 'processing'
+        new_doc.s3_url = object_key
+        new_doc.status = 'processing'
+        db.commit()
+        
+        # Queue the Celery task
+        process_document_task.delay(object_key, file.filename, company_id)
+        
+        # Return 202 Accepted immediately
         return {
-            "status": "success", 
-            "filename": file.filename, 
-            "chunks_processed": chunks_count
+            "status": "processing", 
+            "filename": file.filename,
+            "document_id": new_doc.id,
+            "message": "Document uploaded securely and queued for processing."
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/documents/{document_id}/status")
+def get_document_status(document_id: str, db: Session = Depends(get_db)):
+    doc = db.query(models.Document).filter(models.Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    return {
+        "document_id": doc.id,
+        "filename": doc.filename,
+        "status": doc.status
+    }
 
 from pydantic import BaseModel
 class RAGQuery(BaseModel):
@@ -202,6 +239,34 @@ def save_allowed_tables(request: schemas.AllowedTableCreate, db: Session = Depen
     db.commit()
     return {"status": "success", "message": "Access policy saved"}
 
+@app.post("/api/connections/api", response_model=schemas.APIConnectionResponse)
+def create_api_connection(request: schemas.APIConnectionCreate, db: Session = Depends(get_db)):
+    enc_api_key = encrypt(request.api_key)
+    new_conn = models.APIConnection(
+        company_id=request.company_id,
+        name=request.name,
+        base_url=request.base_url,
+        auth_type=request.auth_type,
+        encrypted_api_key=enc_api_key
+    )
+    db.add(new_conn)
+    db.commit()
+    db.refresh(new_conn)
+    return new_conn
+
+@app.post("/api/connections/api/allowed-endpoints")
+def save_allowed_endpoints(request: schemas.AllowedEndpointCreate, db: Session = Depends(get_db)):
+    db.query(models.AllowedEndpoint).filter(models.AllowedEndpoint.connection_id == request.connection_id).delete()
+    for ep in request.endpoints:
+        db.add(models.AllowedEndpoint(
+            connection_id=request.connection_id,
+            path=ep.path,
+            method=ep.method,
+            description=ep.description
+        ))
+    db.commit()
+    return {"status": "success", "message": "Access policy saved"}
+
 
 # =============================================================================
 # Phase 5: AI Engine & Query Router
@@ -248,7 +313,12 @@ def chat_with_ai(request: schemas.ChatRequest, db: Session = Depends(get_db)):
             detail=f"Invalid provider '{provider}'. Choose from: {list(VALID_PROVIDERS)}"
         )
 
-    config = EngineConfig(provider=provider, answer_model=model, router_model=model)
+    api_key = None
+    if llm_config and llm_config.encrypted_api_key:
+        from encryption import decrypt
+        api_key = decrypt(llm_config.encrypted_api_key)
+
+    config = EngineConfig(provider=provider, answer_model=model, router_model=model, api_key=api_key)
 
     try:
         result = run_ai_engine(

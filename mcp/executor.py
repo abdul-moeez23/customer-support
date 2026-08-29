@@ -10,6 +10,50 @@ It strictly enforces the access policy by:
 
 from typing import Any
 from sqlalchemy import create_engine, text
+import httpx
+
+def execute_rest_api_call(
+    base_url: str,
+    path: str,
+    method: str,
+    auth_type: str,
+    api_key: str,
+    parameters: dict[str, Any] | None = None
+) -> dict | list:
+    url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+    headers = {}
+    if auth_type == "bearer":
+        headers["Authorization"] = f"Bearer {api_key}"
+    elif auth_type == "basic":
+        # Usually handled differently, but we'll put it in auth if needed, or simple header
+        import base64
+        auth_str = base64.b64encode(f"{api_key}:".encode()).decode()
+        headers["Authorization"] = f"Basic {auth_str}"
+    elif auth_type == "header":
+        # Assume it's x-api-key or similar; maybe a bit basic, let's just do x-api-key
+        headers["x-api-key"] = api_key
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            if method.upper() == "GET":
+                response = client.get(url, headers=headers, params=parameters)
+            elif method.upper() == "POST":
+                response = client.post(url, headers=headers, json=parameters)
+            elif method.upper() == "PUT":
+                response = client.put(url, headers=headers, json=parameters)
+            elif method.upper() == "DELETE":
+                response = client.delete(url, headers=headers, params=parameters)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
+            
+            response.raise_for_status()
+            
+            try:
+                return response.json()
+            except:
+                return {"text": response.text}
+    except Exception as e:
+        raise Exception(f"API call failed: {str(e)}")
 
 
 def _build_connection_url(db_type: str, host: str, port: str,

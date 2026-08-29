@@ -18,7 +18,7 @@ export default function InboxPage() {
     const companyId = localStorage.getItem("company_id");
     if (!companyId) return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/conversations?company_id=${companyId}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/conversations?company_id=${companyId}`);
       if (res.ok) {
         const data = await res.json();
         setConversations(data);
@@ -33,7 +33,7 @@ export default function InboxPage() {
   const selectConversation = async (conv: any) => {
     setSelectedConv(conv);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/conversations/${conv.id}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/conversations/${conv.id}`);
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages);
@@ -53,7 +53,7 @@ export default function InboxPage() {
     setMessages(prev => [...prev, { id: Date.now().toString(), role: "agent", content: text }]);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/conversations/${selectedConv.id}/reply`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/conversations/${selectedConv.id}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: text })
@@ -69,7 +69,7 @@ export default function InboxPage() {
   const handleResolve = async () => {
     if (!selectedConv) return;
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/conversations/${selectedConv.id}/status`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/conversations/${selectedConv.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "resolved" })

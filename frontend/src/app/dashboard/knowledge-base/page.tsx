@@ -20,14 +20,14 @@ export default function KnowledgeBasePage() {
     }
 
     setUploading(true);
-    setMessage({ text: "", type: "" });
+    setMessage({ text: "Uploading...", type: "info" });
 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("company_id", companyId);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/documents`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/documents`, {
         method: "POST",
         body: formData,
       });
@@ -38,14 +38,35 @@ export default function KnowledgeBasePage() {
         throw new Error(data.detail || "Upload failed");
       }
 
-      setMessage({
-        text: `"${data.filename}" was processed and stored as ${data.chunks_processed} semantic chunks in your knowledge base.`,
-        type: "success",
-      });
-      setFile(null);
+      const docId = data.document_id;
+      setMessage({ text: "Processing in background...", type: "info" });
+
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/documents/${docId}/status`);
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (statusData.status === "completed") {
+              clearInterval(poll);
+              setUploading(false);
+              setMessage({
+                text: `"${statusData.filename}" was successfully processed and added to your knowledge base.`,
+                type: "success",
+              });
+              setFile(null);
+            } else if (statusData.status === "failed") {
+              clearInterval(poll);
+              setUploading(false);
+              setMessage({ text: "Document processing failed.", type: "error" });
+            }
+          }
+        } catch (err) {
+          console.error("Polling error:", err);
+        }
+      }, 2000);
+
     } catch (err: any) {
       setMessage({ text: err.message, type: "error" });
-    } finally {
       setUploading(false);
     }
   };
@@ -62,8 +83,8 @@ export default function KnowledgeBasePage() {
       </div>
 
       {/* Upload card */}
-      <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
-        <h2 className="text-sm font-bold text-zinc-900 mb-4">Upload Document</h2>
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm transition-colors">
+        <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 mb-4">Upload Document</h2>
         <form onSubmit={handleUpload} className="space-y-4">
           {/* Drop zone */}
           <div
@@ -134,12 +155,13 @@ export default function KnowledgeBasePage() {
             <div className={`flex items-start gap-2.5 text-sm p-3.5 rounded-lg border ${
               message.type === "error"
                 ? "bg-red-50 border-red-100 text-red-700"
+                : message.type === "info"
+                ? "bg-blue-50 border-blue-100 text-blue-700"
                 : "bg-emerald-50 border-emerald-100 text-emerald-700"
             }`}>
-              {message.type === "error"
-                ? <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500 mt-0.5" />
-                : <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-500 mt-0.5" />
-              }
+              {message.type === "error" && <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500 mt-0.5" />}
+              {message.type === "info" && <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin flex-shrink-0 mt-0.5" />}
+              {message.type === "success" && <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-500 mt-0.5" />}
               <span className="leading-relaxed">{message.text}</span>
             </div>
           )}

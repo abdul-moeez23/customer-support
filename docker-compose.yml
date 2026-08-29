@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   backend:
+    restart: "no"
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -12,15 +13,24 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/aicustomer
-      - MCP_SERVER_URL=http://mcp:8001
-      - MCP_SECRET_KEY=${MCP_SECRET_KEY:-dev-mcp-secret-change-in-production}
+      - DATABASE_URL=${DATABASE_URL}
+      - MCP_SERVER_URL=${MCP_SERVER_URL}
+      - MCP_SECRET_KEY=${MCP_SECRET_KEY}
       - WATCHFILES_FORCE_POLLING=true
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - QDRANT_URL=${QDRANT_URL}
     depends_on:
       - db
       - mcp
+      - redis
+      - minio
+      - qdrant
 
   mcp:
+    restart: "no"
     build:
       context: .
       dockerfile: mcp/Dockerfile
@@ -37,6 +47,7 @@ services:
       - db
 
   frontend:
+    restart: "no"
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -55,6 +66,7 @@ services:
       - backend
 
   db:
+    restart: "no"
     image: postgres:15
     environment:
       POSTGRES_USER: postgres
@@ -66,6 +78,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   pgadmin:
+    restart: "no"
     image: dpage/pgadmin4
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
@@ -75,5 +88,57 @@ services:
     depends_on:
       - db
 
+  redis:
+    restart: "no"
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  minio:
+    restart: "no"
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  celery_worker:
+    restart: "no"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A worker.celery_app worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - QDRANT_URL=${QDRANT_URL}
+    depends_on:
+      - db
+      - redis
+      - minio
+      - qdrant
+
+  qdrant:
+    restart: "no"
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
 volumes:
   postgres_data:
+  minio_data:
+  qdrant_data:

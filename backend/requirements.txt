@@ -13,6 +13,11 @@ openai==1.12.0
 pypdf==4.0.1
 langchain-text-splitters==0.0.1
 cryptography==42.0.2
+boto3
+celery
+redis
+sentence-transformers
+torch
 pymysql==1.1.0
 mcp==1.2.0
 # Phase 5: AI Engine dependencies

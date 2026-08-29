@@ -62,6 +62,31 @@ class AllowedTableCreate(BaseModel):
     connection_id: str
     tables: list[str]
 
+class APIConnectionCreate(BaseModel):
+    company_id: str
+    name: str
+    base_url: str
+    auth_type: str
+    api_key: str
+
+class APIConnectionResponse(BaseModel):
+    id: str
+    name: str
+    base_url: str
+    auth_type: str
+    
+    class Config:
+        from_attributes = True
+
+class AllowedEndpointBase(BaseModel):
+    path: str
+    method: str
+    description: str
+
+class AllowedEndpointCreate(BaseModel):
+    connection_id: str
+    endpoints: list[AllowedEndpointBase]
+
 
 # --- AI Engine / Chat Schemas ---
 class ChatRequest(BaseModel):

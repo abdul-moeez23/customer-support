@@ -22,7 +22,8 @@ export default function DashboardPage() {
       }
 
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/companies/${companyId}`);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${apiUrl}/api/companies/${companyId}`);
         if (!res.ok) throw new Error("Company not found");
         const data = await res.json();
         setCompany(data);

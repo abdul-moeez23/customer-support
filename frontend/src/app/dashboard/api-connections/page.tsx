@@ -21,13 +21,37 @@ export default function APIConnectionsPage() {
     setLoading(true);
     setMessage({ text: "", type: "" });
 
-    setTimeout(() => {
-      setLoading(false);
+    const companyId = localStorage.getItem("company_id");
+    if (!companyId) return;
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/connections/api`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, company_id: companyId })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail);
+
+      const epRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/connections/api/allowed-endpoints`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connection_id: data.id, endpoints })
+      });
+      
+      const epData = await epRes.json();
+      if (!epRes.ok) throw new Error(epData.detail);
+
       setMessage({
-        text: "API Connection saved. MCP integration for REST APIs is pending backend implementation.",
+        text: "API Connection and Allowed Endpoints saved successfully.",
         type: "success"
       });
-    }, 1000);
+    } catch (err: any) {
+      setMessage({ text: err.message, type: "error" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const addEndpoint = () => {

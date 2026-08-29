@@ -2,19 +2,20 @@ import os
 import tempfile
 import uuid
 from typing import List
-from openai import OpenAI
+
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 
+from sentence_transformers import SentenceTransformer
+
 # Initialize clients using the .env variables
-# (Ensure QDRANT_URL, QDRANT_API_KEY, and OPENAI_API_KEY are set in your .env)
 qdrant = QdrantClient(
-    url=os.getenv("QDRANT_URL"),
+    url=os.getenv("QDRANT_URL", "http://qdrant:6333"),
     api_key=os.getenv("QDRANT_API_KEY"),
 )
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 COLLECTION_NAME = "company_documents"
 
@@ -27,7 +28,7 @@ def init_qdrant():
         qdrant.create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=models.VectorParams(
-                size=1536, # Dimension for OpenAI text-embedding-3-small
+                size=384, # Dimension for all-MiniLM-L6-v2
                 distance=models.Distance.COSINE
             )
         )
@@ -99,12 +100,8 @@ def process_and_store_document(file_bytes: bytes, filename: str, company_id: str
 
 def query_documents(query_text: str, company_id: str, limit: int = 5):
     """Searches Qdrant for relevant chunks, strictly isolated by company_id."""
-    # 1. Embed the search query
-    response = openai_client.embeddings.create(
-        input=query_text,
-        model="text-embedding-3-small"
-    )
-    query_vector = response.data[0].embedding
+    # 1. Embed the search query locally
+    query_vector = embedding_model.encode([query_text]).tolist()[0]
 
     # 2. Search Qdrant securely with a Must Match Filter for company_id
     search_results = qdrant.search(

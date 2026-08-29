@@ -32,7 +32,7 @@ export default function WidgetSettingsPage() {
     if (!companyId) return;
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/widget-config/${companyId}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${companyId}`);
       if (res.ok) {
         const data = await res.json();
         setConfig(data);
@@ -53,7 +53,7 @@ export default function WidgetSettingsPage() {
     try {
       const payload = { company_id: companyId, ...config };
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/widget-config`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -78,30 +78,33 @@ export default function WidgetSettingsPage() {
 
   const inputClass = "w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all";
 
-  const ColorInput = ({ label, field }: { label: string; field: string }) => (
-    <div>
-      <label className="block text-xs font-medium text-zinc-600 mb-1.5">{label}</label>
-      <div className="relative flex items-center">
-        <input
-          type="color"
-          value={config[field]}
-          onChange={e => handleChange(field, e.target.value)}
-          className="absolute left-3 w-5 h-5 opacity-0 cursor-pointer z-10"
-          aria-label={`Pick color for ${label}`}
-        />
-        <div
-          className="absolute left-3 w-5 h-5 rounded border border-zinc-200 shadow-sm pointer-events-none"
-          style={{ backgroundColor: config[field] }}
-        />
-        <input
-          type="text"
-          value={config[field]}
-          onChange={e => handleChange(field, e.target.value)}
-          className={inputClass + " pl-11 font-mono text-xs uppercase"}
-        />
+  const renderColorInput = (label: string, field: string) => {
+    const value = config[field as keyof typeof config] as string;
+    return (
+      <div>
+        <label className="block text-xs font-medium text-zinc-600 mb-1.5">{label}</label>
+        <div className="relative flex items-center">
+          <input
+            type="color"
+            value={value || ""}
+            onChange={e => handleChange(field, e.target.value)}
+            className="absolute left-3 w-5 h-5 opacity-0 cursor-pointer z-10"
+            aria-label={`Pick color for ${label}`}
+          />
+          <div
+            className="absolute left-3 w-5 h-5 rounded border border-zinc-200 shadow-sm pointer-events-none"
+            style={{ backgroundColor: value || "" }}
+          />
+          <input
+            type="text"
+            value={value || ""}
+            onChange={e => handleChange(field, e.target.value)}
+            className={inputClass + " pl-11 font-mono text-xs uppercase"}
+          />
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -193,10 +196,10 @@ export default function WidgetSettingsPage() {
                     <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Colors</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <ColorInput label="Primary (Header)" field="primary_color" />
-                    <ColorInput label="Header Text" field="text_color" />
-                    <ColorInput label="User Bubble" field="user_bubble_color" />
-                    <ColorInput label="Bot Bubble" field="bot_bubble_color" />
+                    {renderColorInput("Primary (Header)", "primary_color")}
+                    {renderColorInput("Header Text", "text_color")}
+                    {renderColorInput("User Bubble", "user_bubble_color")}
+                    {renderColorInput("Bot Bubble", "bot_bubble_color")}
                   </div>
                 </div>
 

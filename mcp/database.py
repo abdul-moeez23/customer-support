@@ -32,7 +32,6 @@ class Company(Base):
     __tablename__ = "companies"
     id = Column(String, primary_key=True)
     name = Column(String)
-    widget_key = Column(String)
 
 
 class DatabaseConnection(Base):
@@ -58,6 +57,28 @@ class AllowedTable(Base):
     table_name = Column(String)
 
     connection = relationship("DatabaseConnection", back_populates="allowed_tables")
+
+class APIConnection(Base):
+    __tablename__ = "api_connections"
+    id = Column(String, primary_key=True)
+    company_id = Column(String, ForeignKey("companies.id"))
+    name = Column(String)
+    base_url = Column(String)
+    auth_type = Column(String)
+    encrypted_api_key = Column(String)
+
+    allowed_endpoints = relationship("AllowedEndpoint", back_populates="connection")
+    company = relationship("Company")
+
+class AllowedEndpoint(Base):
+    __tablename__ = "allowed_endpoints"
+    id = Column(String, primary_key=True)
+    connection_id = Column(String, ForeignKey("api_connections.id"))
+    path = Column(String)
+    method = Column(String)
+    description = Column(String)
+
+    connection = relationship("APIConnection", back_populates="allowed_endpoints")
 
 
 def get_db():

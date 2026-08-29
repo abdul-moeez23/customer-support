@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Any
 from sqlalchemy.orm import Session
 
-from .database import DatabaseConnection, AllowedTable
+from .database import DatabaseConnection, AllowedTable, APIConnection, AllowedEndpoint
 from .encryption import decrypt
 from .executor import execute_select_on_table
 
@@ -100,6 +100,59 @@ class MCPToolDefinition:
             limit=min(limit, 50),  # hard cap at 50
         )
 
+class APIRESTToolDefinition:
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        connection_id: str,
+        base_url: str,
+        auth_type: str,
+        encrypted_api_key: str,
+        path: str,
+        method: str,
+    ):
+        self.name = name
+        self.description = description
+        self.connection_id = connection_id
+        self.base_url = base_url
+        self.auth_type = auth_type
+        self.encrypted_api_key = encrypted_api_key
+        self.path = path
+        self.method = method
+
+    def to_schema(self) -> dict:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "parameters": {
+                        "type": "object",
+                        "description": "Optional parameters to send with the API request.",
+                        "additionalProperties": True,
+                    }
+                },
+                "required": [],
+            },
+        }
+
+    def execute(self, parameters: dict[str, Any] | None = None) -> list[dict]:
+        from .executor import execute_rest_api_call
+        plain_password = decrypt(self.encrypted_api_key)
+        res = execute_rest_api_call(
+            base_url=self.base_url,
+            path=self.path,
+            method=self.method,
+            auth_type=self.auth_type,
+            api_key=plain_password,
+            parameters=parameters,
+        )
+        if isinstance(res, list):
+            return res
+        return [res]
+
 
 # ---------------------------------------------------------------------------
 # Tool generation
@@ -160,6 +213,36 @@ def generate_tools_for_company(company_id: str, db: Session) -> list[MCPToolDefi
                 allowed_tables=allowed_table_names,
             )
             tools.append(tool)
+
+    api_connections: list[APIConnection] = (
+        db.query(APIConnection)
+        .filter(APIConnection.company_id == company_id)
+        .all()
+    )
+
+    for api_conn in api_connections:
+        endpoints: list[AllowedEndpoint] = (
+            db.query(AllowedEndpoint)
+            .filter(AllowedEndpoint.connection_id == api_conn.id)
+            .all()
+        )
+        for ep in endpoints:
+            ep_slug = ep.path.strip("/").replace("/", "_").replace("-", "_")
+            if not ep_slug:
+                ep_slug = "root"
+            tool_name = f"api_{api_conn.name.lower().replace(' ', '_').replace('-', '_')[:10]}_{ep.method.lower()}_{ep_slug}"
+            
+            tool = APIRESTToolDefinition(
+                name=tool_name,
+                description=f"Call REST API {api_conn.name} endpoint {ep.method} {ep.path}. Description: {ep.description}",
+                connection_id=api_conn.id,
+                base_url=api_conn.base_url,
+                auth_type=api_conn.auth_type,
+                encrypted_api_key=api_conn.encrypted_api_key,
+                path=ep.path,
+                method=ep.method,
+            )
+            tools.append(tool) # type: ignore
 
     return tools
 

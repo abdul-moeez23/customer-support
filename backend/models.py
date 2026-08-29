@@ -7,6 +7,18 @@ from database import Base
 def generate_uuid():
     return str(uuid.uuid4())
 
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    company_id = Column(String, ForeignKey("companies.id"), nullable=False)
+    filename = Column(String, nullable=False)
+    s3_url = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="pending") # pending, processing, completed, failed
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    company = relationship("Company")
+
 class Company(Base):
     __tablename__ = "companies"
     
@@ -51,6 +63,29 @@ class AllowedTable(Base):
     table_name = Column(String, nullable=False)
     
     connection = relationship("DatabaseConnection")
+
+class APIConnection(Base):
+    __tablename__ = "api_connections"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    company_id = Column(String, ForeignKey("companies.id"), nullable=False)
+    name = Column(String, nullable=False)
+    base_url = Column(String, nullable=False)
+    auth_type = Column(String, nullable=False) # e.g. bearer, basic, header
+    encrypted_api_key = Column(String, nullable=False)
+    
+    company = relationship("Company")
+
+class AllowedEndpoint(Base):
+    __tablename__ = "allowed_endpoints"
+    
+    id = Column(String, primary_key=True, default=generate_uuid)
+    connection_id = Column(String, ForeignKey("api_connections.id"), nullable=False)
+    path = Column(String, nullable=False)
+    method = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    
+    connection = relationship("APIConnection")
 
 
 class LLMConfig(Base):
