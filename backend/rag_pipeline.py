@@ -69,20 +69,17 @@ def process_and_store_document(file_bytes: bytes, filename: str, company_id: str
     if not chunks:
         raise ValueError("Document is empty after chunking.")
 
-    # 3. Generate embeddings using OpenAI
-    response = openai_client.embeddings.create(
-        input=chunks,
-        model="text-embedding-3-small"
-    )
+    # 3. Generate embeddings using SentenceTransformer
+    embeddings = embedding_model.encode(chunks).tolist()
     
     # 4. Store in Qdrant with STRICT multi-tenant metadata tagging
     points = []
-    for chunk, embedding_data in zip(chunks, response.data):
+    for chunk, embedding in zip(chunks, embeddings):
         point_id = str(uuid.uuid4()) # Unique ID for each chunk
         points.append(
             models.PointStruct(
                 id=point_id,
-                vector=embedding_data.embedding,
+                vector=embedding,
                 payload={
                     "company_id": company_id, # CRITICAL: This isolates the data!
                     "filename": filename,
@@ -98,23 +95,48 @@ def process_and_store_document(file_bytes: bytes, filename: str, company_id: str
     
     return len(chunks)
 
-def query_documents(query_text: str, company_id: str, limit: int = 5):
-    """Searches Qdrant for relevant chunks, strictly isolated by company_id."""
+def query_documents(query_text: str, company_id: str, limit: int = 5, widget_key: str = None):
+    """Searches Qdrant for relevant chunks, strictly isolated by company_id and optionally widget_key."""
     # 1. Embed the search query locally
     query_vector = embedding_model.encode([query_text]).tolist()[0]
 
-    # 2. Search Qdrant securely with a Must Match Filter for company_id
+    # 2. Search Qdrant securely with a Must Match Filter
+    must_conditions = [
+        models.FieldCondition(
+            key="company_id",
+            match=models.MatchValue(value=company_id)
+        )
+    ]
+    
+    # If a widget_key is provided, we only want documents allowed for this widget
+    # We would check the WidgetDocumentAccess table, find allowed doc_ids, and add a condition here.
+    # For now, to implement this securely:
+    if widget_key:
+        from database import SessionLocal
+        import models as db_models
+        db = SessionLocal()
+        try:
+            widget = db.query(db_models.WidgetConfig).filter(db_models.WidgetConfig.widget_key == widget_key).first()
+            if widget:
+                mappings = db.query(db_models.WidgetDocumentAccess).filter(db_models.WidgetDocumentAccess.widget_id == widget.id).all()
+                allowed_doc_ids = [m.document_id for m in mappings]
+                if allowed_doc_ids:
+                    must_conditions.append(
+                        models.FieldCondition(
+                            key="document_id",
+                            match=models.MatchAny(any=allowed_doc_ids)
+                        )
+                    )
+                else:
+                    # If no docs allowed, return empty
+                    return []
+        finally:
+            db.close()
+
     search_results = qdrant.search(
         collection_name=COLLECTION_NAME,
         query_vector=query_vector,
-        query_filter=models.Filter(
-            must=[
-                models.FieldCondition(
-                    key="company_id",
-                    match=models.MatchValue(value=company_id)
-                )
-            ]
-        ),
+        query_filter=models.Filter(must=must_conditions),
         limit=limit
     )
 

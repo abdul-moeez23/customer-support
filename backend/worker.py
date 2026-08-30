@@ -84,7 +84,8 @@ def process_document_task(object_key: str, filename: str, company_id: str):
                     id=point_id,
                     vector=embedding_vector,
                     payload={
-                        "company_id": company_id, 
+                        "company_id": company_id,
+                        "document_id": doc.id if doc else "unknown",
                         "filename": filename,
                         "text": chunk
                     }

@@ -29,20 +29,15 @@ _HEADERS = {"X-MCP-Secret": MCP_SECRET_KEY}
 _TIMEOUT = 30.0
 
 
-def list_tools(company_id: str) -> list[dict]:
+def list_tools(company_id: str, widget_key: str = None) -> list[dict]:
     """
-    Fetch all available MCP tool schemas for a company.
-
-    Returns a list of tool schema dicts, each containing:
-      - name (str)
-      - description (str)
-      - inputSchema (dict)
-
-    Returns an empty list if the MCP server is unreachable or the company
-    has no approved database connections.
+    Fetch all available MCP tool schemas.
     """
     try:
         url = f"{MCP_SERVER_URL}/mcp/{company_id}/tools"
+        if widget_key:
+            url += f"?widget_key={widget_key}"
+            
         with httpx.Client(timeout=_TIMEOUT) as client:
             response = client.get(url, headers=_HEADERS)
             response.raise_for_status()
@@ -57,23 +52,13 @@ def list_tools(company_id: str) -> list[dict]:
         return []
 
 
-def execute_tool(company_id: str, tool_name: str, arguments: dict[str, Any]) -> list[dict]:
+def execute_tool(company_id: str, tool_name: str, arguments: dict[str, Any], widget_key: str = None) -> list[dict]:
     """
-    Execute a specific MCP tool for a company and return the results.
-
-    Args:
-        company_id: The company's unique ID.
-        tool_name:  The name of the tool to run (e.g. "query_orders").
-        arguments:  Arguments to pass to the tool (e.g. {"filters": {"status": "pending"}}).
-
-    Returns:
-        A list of row dicts returned by the tool.
-
-    Raises:
-        RuntimeError: If the MCP server returns an error.
-        PermissionError: If the tool is not approved for this company.
+    Execute a specific MCP tool and return the results.
     """
     url = f"{MCP_SERVER_URL}/mcp/{company_id}/tools/execute"
+    if widget_key:
+        url += f"?widget_key={widget_key}"
     payload = {"tool_name": tool_name, "arguments": arguments}
 
     try:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Database, ShieldCheck, Server, AlertCircle, CheckCircle2 } from "lucide-react";
 import { CustomSelect } from "@/components/CustomSelect";
 
@@ -19,6 +19,33 @@ export default function DBConnectionsPage() {
   const [tables, setTables] = useState<string[]>([]);
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
+
+  const [widgets, setWidgets] = useState<Record<string, unknown>[]>([]);
+  const [selectedWidgets, setSelectedWidgets] = useState<string[]>([]);
+  const [savingPolicy, setSavingPolicy] = useState(false);
+
+  const fetchWidgets = async () => {
+    const companyId = localStorage.getItem("company_id");
+    if (!companyId) return;
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${companyId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setWidgets(data);
+          // By default select all widgets
+          setSelectedWidgets(data.map((w: Record<string, unknown>) => w.id as string));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load widgets", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchWidgets();
+  }, []);
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,18 +82,38 @@ export default function DBConnectionsPage() {
 
   const handleSavePolicy = async () => {
     if (!connectionId) return;
+    setSavingPolicy(true);
 
     try {
+      // First save global access policy for the connection
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/connections/database/allowed-tables`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ connection_id: connectionId, tables: selectedTables })
       });
 
-      if (!res.ok) throw new Error("Failed to save policy");
-      setMessage({ text: "Access policy saved. The AI can only query selected tables.", type: "success" });
+      if (!res.ok) throw new Error("Failed to save global table access policy");
+
+      // Now map tables to selected widgets
+      if (selectedWidgets.length > 0 && selectedTables.length > 0) {
+        const promises = selectedWidgets.map(async (widgetId) => {
+          // Sending allowed tables to the specific widget
+          const wRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${widgetId}/tables`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ connection_id: connectionId, tables: selectedTables })
+          });
+          if (!wRes.ok) throw new Error(`Failed to save for widget ${widgetId}`);
+        });
+
+        await Promise.all(promises);
+      }
+
+      setMessage({ text: "Access policy saved and assigned to widgets.", type: "success" });
     } catch (err: any) {
       setMessage({ text: err.message, type: "error" });
+    } finally {
+      setSavingPolicy(false);
     }
   };
 
@@ -226,8 +273,8 @@ export default function DBConnectionsPage() {
                 <h2 className="text-sm font-bold text-zinc-900">Table Access Policy</h2>
               </div>
               <div className="p-5">
-                <p className="text-xs text-zinc-500 mb-4">The AI will only have access to checked tables.</p>
-                <div className="space-y-1 max-h-72 overflow-y-auto mb-5">
+                <p className="text-xs text-zinc-500 mb-4">Select tables the AI can access.</p>
+                <div className="space-y-1 max-h-48 overflow-y-auto mb-5">
                   {tables.map(table => (
                     <label
                       key={table}
@@ -248,11 +295,40 @@ export default function DBConnectionsPage() {
                     </label>
                   ))}
                 </div>
+
+                <div className="border-t border-zinc-100 pt-4 mb-5">
+                  <p className="text-xs text-zinc-500 mb-3">Assign tables to specific widgets:</p>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {widgets.map(w => (
+                      <label key={w.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
+                          checked={selectedWidgets.includes(w.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedWidgets([...selectedWidgets, w.id]);
+                            else setSelectedWidgets(selectedWidgets.filter(id => id !== w.id));
+                          }}
+                        />
+                        <span className="text-sm font-medium text-zinc-700">{w.bot_name || `Widget ${w.id}`}</span>
+                      </label>
+                    ))}
+                    {widgets.length === 0 && (
+                      <div className="text-xs text-zinc-400">No widgets available.</div>
+                    )}
+                  </div>
+                </div>
+
                 <button
                   onClick={handleSavePolicy}
-                  className="w-full flex justify-center items-center gap-2 py-2 px-4 rounded-lg text-sm font-semibold text-white bg-zinc-900 hover:bg-zinc-800 transition-all active:scale-[0.98] cursor-pointer"
+                  disabled={savingPolicy}
+                  className="w-full flex justify-center items-center gap-2 py-2 px-4 rounded-lg text-sm font-semibold text-white bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
+                  {savingPolicy ? (
+                    <div className="w-4 h-4 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
                   Save Access Policy
                 </button>
               </div>

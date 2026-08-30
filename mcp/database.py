@@ -88,3 +88,16 @@ def get_db():
         yield db
     finally:
         db.close()
+
+class WidgetConfig(Base):
+    __tablename__ = 'widget_configs'
+    id = Column(String, primary_key=True)
+    company_id = Column(String, ForeignKey('companies.id'))
+    widget_key = Column(String)
+
+class WidgetTableAccess(Base):
+    __tablename__ = 'widget_table_access'
+    id = Column(String, primary_key=True)
+    widget_id = Column(String, ForeignKey('widget_configs.id'))
+    allowed_table_id = Column(String, ForeignKey('allowed_tables.id'))
+

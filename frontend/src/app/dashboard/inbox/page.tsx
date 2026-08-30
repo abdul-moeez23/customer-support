@@ -11,26 +11,27 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchConversations = async () => {
+      const companyId = localStorage.getItem("company_id");
+      if (!companyId) return;
+
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/conversations?company_id=${companyId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setConversations(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch conversations", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchConversations();
   }, []);
 
-  const fetchConversations = async () => {
-    const companyId = localStorage.getItem("company_id");
-    if (!companyId) return;
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/conversations?company_id=${companyId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setConversations(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch conversations", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectConversation = async (conv: any) => {
+  const selectConversation = async (conv: Record<string, unknown>) => {
     setSelectedConv(conv);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/conversations/${conv.id}`);
@@ -75,7 +76,7 @@ export default function InboxPage() {
         body: JSON.stringify({ status: "resolved" })
       });
       fetchConversations();
-      setSelectedConv((prev: any) => ({ ...prev, status: "resolved" }));
+      setSelectedConv((prev: Record<string, unknown> | null) => prev ? ({ ...prev, status: "resolved" }) : null);
     } catch (err) {
       console.error("Failed to resolve", err);
     }

@@ -63,3 +63,35 @@ Based on the requirements and tech stack provided, here is the phased implementa
 - [x] **Backend (`backend/`):** Store chat histories per company and user session (`Conversation` and `Message` models). Mark conversations as "escalated" when requested or when AI fails to answer.
 - [x] **Frontend (`frontend/`):** Build an inbox in the dashboard (`/dashboard/inbox`) for company agents to view and reply to escalated chats.
 - [x] **Milestone 7:** Full end-to-end support workflow including AI deflection and human escalation.
+
+### [ ] Phase 8: Multi-Widget Data Segregation (Widget-Level Access Control)
+**Goal:** Allow companies to create multiple widgets and restrict specific databases and knowledge base documents to specific widgets.
+- [x] **Step 1: Database Schema Updates:** Add `WidgetTableAccess` and `WidgetDocumentAccess` mapping tables to `models.py` and run Alembic migrations.
+- [x] **Step 2: API Updates:** Refactor `/api/widget-config` to support CRUD operations for multiple widgets per company, and endpoints to manage widget-data mappings.
+- [x] **Step 3: AI Engine & RAG Security:** Update `engine.py` to call `list_tools(widget_key)` instead of `company_id`. Update Qdrant metadata tagging and querying to filter strictly by `widget_id`.
+- [x] **Step 4: Frontend UI Updates (Pending Implementation by User):**
+  - **`widget-settings/page.tsx`**: 
+    - Change API call to `GET /api/widget-config/{company_id}` which now returns an *array* of widgets.
+    - Add a sidebar or dropdown to select an active widget from the list.
+    - Add a "Create Widget" button that posts a new config to `POST /api/widget-config/create`.
+    - Change the save handler to use `PUT /api/widget-config/{widget_id}` to update the currently selected widget.
+  - **`knowledge-base/page.tsx`**:
+    - Fetch the list of widgets (`GET /api/widget-config/{company_id}`).
+    - After successfully uploading a document via `POST /api/documents`, render a modal or checkbox list asking "Which widgets should access this document?".
+    - Submit the selections by appending the new `doc_id` to the widget's allowed document IDs via `POST /api/widget-config/{widget_id}/documents`. *(Note: this API overwrites the widget's list, so the frontend must fetch existing `document_id`s first and append, or a new append API should be created).*
+  - **`db-connections/page.tsx`**:
+    - Fetch the list of widgets.
+    - During the `handleSavePolicy` step (where allowed tables are chosen), present a selector for which widgets can access the newly approved tables.
+    - Submit the selections via `POST /api/widget-config/{widget_id}/tables`, ensuring existing table mappings for those widgets are preserved and appended.
+
+### [ ] Phase 9: Document Management & Unlinking
+**Goal:** Allow users to manage (view, edit access, or hard delete) documents after they have been uploaded.
+- [ ] **Backend (`backend/main.py`):**
+  - Create `GET /api/documents/company/{company_id}` to fetch a list of all documents belonging to a company, including an array of `widget_ids` they are linked to.
+  - Create `PUT /api/documents/{document_id}/widgets` to replace/update the list of widgets a document is linked to (by deleting old mappings in `widget_document_access` and inserting new ones).
+  - Create `DELETE /api/documents/{document_id}` to permanently delete a document, its vector embeddings, and all its widget mappings.
+- [ ] **Frontend (`frontend/src/app/dashboard/knowledge-base/page.tsx`):**
+  - Call the new `GET /api/documents/company/{company_id}` endpoint on load.
+  - Render a "Your Uploaded Documents" list below the upload form showing filename, status, and size.
+  - Add a "Manage Access" button next to each document that re-opens the `Widget Assignment Modal`, pre-checking the currently assigned widgets. Clicking save will call the new `PUT` endpoint.
+  - Add a "Delete" button next to each document that calls the new `DELETE` endpoint to permanently free up space.

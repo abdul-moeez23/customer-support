@@ -439,49 +439,136 @@ def _default_widget_config(company_id: str) -> schemas.WidgetConfigResponse:
     )
 
 
-@app.get("/api/widget-config/{company_id}", response_model=schemas.WidgetConfigResponse)
-def get_widget_config(company_id: str, db: Session = Depends(get_db)):
-    """Fetch the widget appearance config for a company (dashboard use)."""
+@app.get("/api/widget-config/{company_id}", response_model=list[schemas.WidgetConfigResponse])
+def get_widget_configs(company_id: str, db: Session = Depends(get_db)):
+    """Fetch all widget configurations for a company."""
     company = db.query(models.Company).filter(models.Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    config = db.query(models.WidgetConfig).filter(
+    configs = db.query(models.WidgetConfig).filter(
         models.WidgetConfig.company_id == company_id
-    ).first()
+    ).all()
+    
+    if not configs:
+        # Create a default one if none exist
+        default_config = models.WidgetConfig(
+            company_id=company_id,
+            bot_name="Support Assistant",
+            greeting_message="👋 Hi! How can I help you today?",
+            placeholder_text="Type your message...",
+            primary_color="#2563eb",
+            text_color="#ffffff",
+            bg_color="#ffffff",
+            user_bubble_color="#2563eb",
+            bot_bubble_color="#f3f4f6",
+            position="bottom-right",
+            show_branding=True,
+            allow_attachments=False
+        )
+        db.add(default_config)
+        db.commit()
+        db.refresh(default_config)
+        configs = [default_config]
 
-    if not config:
-        return _default_widget_config(company_id)
-    return config
+    return configs
 
-
-@app.post("/api/widget-config", response_model=schemas.WidgetConfigResponse)
-def save_widget_config(request: schemas.WidgetConfigUpdate, db: Session = Depends(get_db)):
-    """Save or update the widget appearance config for a company."""
+@app.post("/api/widget-config/create", response_model=schemas.WidgetConfigResponse)
+def create_widget_config(request: schemas.WidgetConfigCreate, db: Session = Depends(get_db)):
+    """Create a new widget configuration for a company."""
     company = db.query(models.Company).filter(models.Company.id == request.company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    valid_positions = {"bottom-right", "bottom-left"}
-    if request.position not in valid_positions:
-        raise HTTPException(status_code=400, detail=f"Position must be one of: {valid_positions}")
+    new_config = models.WidgetConfig(**request.model_dump())
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+    return new_config
 
-    config = db.query(models.WidgetConfig).filter(
-        models.WidgetConfig.company_id == request.company_id
-    ).first()
+@app.put("/api/widget-config/{widget_id}", response_model=schemas.WidgetConfigResponse)
+def update_widget_config(widget_id: str, request: schemas.WidgetConfigUpdate, db: Session = Depends(get_db)):
+    """Update an existing widget configuration."""
+    config = db.query(models.WidgetConfig).filter(models.WidgetConfig.id == widget_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Widget not found")
 
-    fields = request.model_dump(exclude={"company_id"})
-
-    if config:
-        for key, val in fields.items():
-            setattr(config, key, val)
-    else:
-        config = models.WidgetConfig(company_id=request.company_id, **fields)
-        db.add(config)
-
+    fields = request.model_dump(exclude_unset=True)
+    for key, val in fields.items():
+        setattr(config, key, val)
+        
     db.commit()
     db.refresh(config)
     return config
+
+from pydantic import BaseModel
+class WidgetTableMapRequest(BaseModel):
+    connection_id: str
+    tables: list[str]
+
+@app.post("/api/widget-config/{widget_id}/tables")
+def map_widget_tables(widget_id: str, request: WidgetTableMapRequest, db: Session = Depends(get_db)):
+    """Map allowed tables to a specific widget."""
+    config = db.query(models.WidgetConfig).filter(models.WidgetConfig.id == widget_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Widget not found")
+        
+    # Clear existing mappings for this connection/widget combo
+    # We must find the allowed tables for this connection first to delete them
+    allowed_tables = db.query(models.AllowedTable).filter(
+        models.AllowedTable.connection_id == request.connection_id
+    ).all()
+    allowed_table_ids = [at.id for at in allowed_tables]
+    
+    if allowed_table_ids:
+        db.query(models.WidgetTableAccess).filter(
+            models.WidgetTableAccess.widget_id == widget_id,
+            models.WidgetTableAccess.allowed_table_id.in_(allowed_table_ids)
+        ).delete(synchronize_session=False)
+    
+    # Add new mappings
+    for table_name in request.tables:
+        allowed_table = db.query(models.AllowedTable).filter(
+            models.AllowedTable.connection_id == request.connection_id,
+            models.AllowedTable.table_name == table_name
+        ).first()
+        
+        if allowed_table:
+            mapping = models.WidgetTableAccess(
+                widget_id=widget_id,
+                allowed_table_id=allowed_table.id
+            )
+            db.add(mapping)
+        
+    db.commit()
+    return {"status": "success"}
+
+class WidgetDocumentMapRequest(BaseModel):
+    document_id: str
+
+@app.post("/api/widget-config/{widget_id}/documents")
+def map_widget_document(widget_id: str, request: WidgetDocumentMapRequest, db: Session = Depends(get_db)):
+    """Map a document to a specific widget."""
+    config = db.query(models.WidgetConfig).filter(models.WidgetConfig.id == widget_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Widget not found")
+        
+    # Check if exists
+    existing = db.query(models.WidgetDocumentAccess).filter(
+        models.WidgetDocumentAccess.widget_id == widget_id,
+        models.WidgetDocumentAccess.document_id == request.document_id
+    ).first()
+    
+    if not existing:
+        mapping = models.WidgetDocumentAccess(
+            widget_id=widget_id,
+            document_id=request.document_id
+        )
+        db.add(mapping)
+        db.commit()
+        
+    return {"status": "success"}
+
 
 
 # ── Public endpoints (used by the embeddable widget, no auth required) ───────

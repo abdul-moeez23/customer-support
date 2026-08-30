@@ -13,4 +13,4 @@ COPY . .
 EXPOSE 8001
 
 # Run with uvicorn — the mcp package is at /app, so we import mcp.server:app
-CMD ["uvicorn", "mcp.server:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+CMD ["uvicorn", "mcp.server:app", "--host", "0.0.0.0", "--port", "8001", "--reload", "--reload-dir", "mcp"]

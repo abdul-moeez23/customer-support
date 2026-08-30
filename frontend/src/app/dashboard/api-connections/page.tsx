@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link as LinkIcon, Plus, Save, Server, Code2, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 import { CustomSelect } from "@/components/CustomSelect";
 
@@ -15,6 +15,25 @@ export default function APIConnectionsPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
   const [endpoints, setEndpoints] = useState([{ path: "/customers", method: "GET", description: "List customers" }]);
+  const [apis, setApis] = useState<Record<string, unknown>[]>([]);
+
+  useEffect(() => {
+    const fetchApis = async () => {
+      const companyId = localStorage.getItem("company_id");
+      if (!companyId) return;
+
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/connections/api/${companyId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setApis(data);
+        }
+      } catch (err) {
+        console.error("Failed to load API connections", err);
+      }
+    };
+    fetchApis();
+  }, []);
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -2,11 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Check, Activity, Shield, Key, Server, Database, Code2, TrendingUp } from "lucide-react";
+import { Copy, Check, Activity, Shield, Key, Server, Database, Code2 } from "lucide-react";
+
+interface Company {
+  id: string;
+  name: string;
+  widget_key: string;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [company, setCompany] = useState<any>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
@@ -28,7 +34,7 @@ export default function DashboardPage() {
         const data = await res.json();
         setCompany(data);
       } catch (err) {
-        console.error(err);
+        console.error("Fetch company failed:", (err as Error).message);
         router.push("/signup");
       } finally {
         setLoading(false);

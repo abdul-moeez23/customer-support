@@ -158,18 +158,24 @@ class APIRESTToolDefinition:
 # Tool generation
 # ---------------------------------------------------------------------------
 
-def generate_tools_for_company(company_id: str, db: Session) -> list[MCPToolDefinition]:
+def generate_tools_for_company(company_id: str, db: Session, widget_key: str | None = None) -> list[MCPToolDefinition]:
     """
-    Inspect all DatabaseConnections and AllowedTables for a given company
-    and produce a list of MCPToolDefinition objects, one per approved table.
-
-    Args:
-        company_id: The company's unique ID.
-        db:         An active SQLAlchemy session connected to the main platform DB.
-
-    Returns:
-        A list of MCPToolDefinition objects ready to be called or serialized.
+    Inspect all DatabaseConnections and AllowedTables for a given company.
+    If widget_key is provided, only include tools/tables mapped to that widget.
     """
+    from .database import WidgetConfig, WidgetTableAccess
+    
+    # If a widget_key is provided, resolve the explicitly allowed tables
+    allowed_table_ids = None
+    if widget_key:
+        widget = db.query(WidgetConfig).filter(WidgetConfig.widget_key == widget_key).first()
+        if widget:
+            mappings = db.query(WidgetTableAccess).filter(WidgetTableAccess.widget_id == widget.id).all()
+            allowed_table_ids = {m.allowed_table_id for m in mappings}
+        else:
+            # Widget not found, allow zero tables
+            allowed_table_ids = set()
+
     connections: list[DatabaseConnection] = (
         db.query(DatabaseConnection)
         .filter(DatabaseConnection.company_id == company_id)
@@ -180,11 +186,13 @@ def generate_tools_for_company(company_id: str, db: Session) -> list[MCPToolDefi
 
     for conn in connections:
         # Gather the approved table names for this connection
-        allowed: list[AllowedTable] = (
-            db.query(AllowedTable)
-            .filter(AllowedTable.connection_id == conn.id)
-            .all()
-        )
+        allowed_query = db.query(AllowedTable).filter(AllowedTable.connection_id == conn.id)
+        
+        if allowed_table_ids is not None:
+            # Filter the allowed tables based on the widget's mapping
+            allowed_query = allowed_query.filter(AllowedTable.id.in_(allowed_table_ids))
+            
+        allowed: list[AllowedTable] = allowed_query.all()
         allowed_table_names = [at.table_name for at in allowed]
 
         if not allowed_table_names:

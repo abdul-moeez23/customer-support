@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BookOpen, UploadCloud, FileText, CheckCircle2, AlertCircle, X } from "lucide-react";
 
 export default function KnowledgeBasePage() {
@@ -8,6 +8,34 @@ export default function KnowledgeBasePage() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
   const [dragOver, setDragOver] = useState(false);
+
+  const [widgets, setWidgets] = useState<Record<string, unknown>[]>([]);
+  const [docId, setDocId] = useState<string | null>(null);
+  const [showWidgetModal, setShowWidgetModal] = useState(false);
+  const [selectedWidgets, setSelectedWidgets] = useState<string[]>([]);
+  const [savingWidgets, setSavingWidgets] = useState(false);
+
+  useEffect(() => {
+    const fetchWidgets = async () => {
+      const companyId = localStorage.getItem("company_id");
+      if (!companyId) return;
+
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${companyId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setWidgets(data);
+            // By default, pre-select all widgets
+            setSelectedWidgets(data.map((w: Record<string, unknown>) => w.id as string));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load widgets", err);
+      }
+    };
+    fetchWidgets();
+  }, []);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,22 +66,24 @@ export default function KnowledgeBasePage() {
         throw new Error(data.detail || "Upload failed");
       }
 
-      const docId = data.document_id;
+      const newDocId = data.document_id;
       setMessage({ text: "Processing in background...", type: "info" });
 
       const poll = setInterval(async () => {
         try {
-          const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/documents/${docId}/status`);
+          const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/documents/${newDocId}/status`);
           if (statusRes.ok) {
             const statusData = await statusRes.json();
             if (statusData.status === "completed") {
               clearInterval(poll);
               setUploading(false);
               setMessage({
-                text: `"${statusData.filename}" was successfully processed and added to your knowledge base.`,
+                text: `"${statusData.filename}" was successfully processed.`,
                 type: "success",
               });
               setFile(null);
+              setDocId(newDocId);
+              setShowWidgetModal(true);
             } else if (statusData.status === "failed") {
               clearInterval(poll);
               setUploading(false);
@@ -68,6 +98,34 @@ export default function KnowledgeBasePage() {
     } catch (err: any) {
       setMessage({ text: err.message, type: "error" });
       setUploading(false);
+    }
+  };
+
+  const handleSaveWidgetAccess = async () => {
+    if (!docId) return;
+    setSavingWidgets(true);
+
+    try {
+      // For each selected widget, append this doc_id
+      const promises = selectedWidgets.map(async (widgetId) => {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${widgetId}/documents`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ document_id: docId }), // backend expects single doc id to append, or adjust depending on backend API
+        });
+        if (!res.ok) throw new Error(`Failed for widget ${widgetId}`);
+      });
+
+      await Promise.all(promises);
+      
+      setMessage({ text: "Document access saved for selected widgets.", type: "success" });
+      setShowWidgetModal(false);
+      setDocId(null);
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: "Failed to save widget access for some widgets.", type: "error" });
+    } finally {
+      setSavingWidgets(false);
     }
   };
 
@@ -151,7 +209,7 @@ export default function KnowledgeBasePage() {
             )}
           </button>
 
-          {message.text && (
+          {message.text && !showWidgetModal && (
             <div className={`flex items-start gap-2.5 text-sm p-3.5 rounded-lg border ${
               message.type === "error"
                 ? "bg-red-50 border-red-100 text-red-700"
@@ -168,6 +226,55 @@ export default function KnowledgeBasePage() {
         </form>
       </div>
 
+      {/* Widget Assignment Modal */}
+      {showWidgetModal && (
+        <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
+          <h2 className="text-sm font-bold text-zinc-900 mb-2">Assign Document to Widgets</h2>
+          <p className="text-xs text-zinc-500 mb-4">Which widgets should be able to search this document?</p>
+          
+          <div className="space-y-2 mb-6 max-h-48 overflow-y-auto">
+            {widgets.map(w => (
+              <label key={w.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-50 cursor-pointer border border-zinc-100">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
+                  checked={selectedWidgets.includes(w.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedWidgets([...selectedWidgets, w.id]);
+                    else setSelectedWidgets(selectedWidgets.filter(id => id !== w.id));
+                  }}
+                />
+                <span className="text-sm font-medium text-zinc-700">{w.bot_name || `Widget ${w.id}`}</span>
+              </label>
+            ))}
+            {widgets.length === 0 && (
+              <div className="text-sm text-zinc-500">No widgets found. Please create one in Widget Settings.</div>
+            )}
+          </div>
+          
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setShowWidgetModal(false)}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-600 hover:bg-zinc-50 border border-zinc-200"
+            >
+              Skip
+            </button>
+            <button
+              onClick={handleSaveWidgetAccess}
+              disabled={savingWidgets}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {savingWidgets ? (
+                <div className="w-4 h-4 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Save Access
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Info panel */}
       <div className="bg-white border border-zinc-200 rounded-xl p-6">
         <h2 className="text-sm font-bold text-zinc-900 mb-3">How it works</h2>
@@ -175,7 +282,7 @@ export default function KnowledgeBasePage() {
           {[
             "Your document is chunked into semantic segments.",
             "Each chunk is embedded as a vector and stored in your isolated database.",
-            "When a customer asks a question, the AI searches your knowledge base first.",
+            "You map the document to specific widgets in your company.",
             "Answers are grounded in your own content — not generic AI responses.",
           ].map((step, i) => (
             <li key={i} className="flex items-start gap-3 text-sm text-zinc-600">

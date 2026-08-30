@@ -110,31 +110,35 @@ def run_ai_engine(
     company_id: str,
     company_name: str,
     config: EngineConfig,
-    widget_purpose: str = "General Customer Support"
+    widget_purpose: str = "General Customer Support",
+    widget_key: str = None
 ) -> EngineResult:
     """
     Process a customer message through the full AI pipeline.
 
     Steps:
-      1. Discover MCP tools for this company.
+      1. Discover MCP tools for this widget (via widget_key).
       2. Route the query to determine the best strategy.
       3. Execute RAG and/or MCP based on the routing decision.
       4. Synthesize a final answer using the gathered context.
 
     Args:
         message:      The customer's raw message.
-        company_id:   The company's unique ID (for data isolation).
-        company_name: The company's display name (used in the system prompt).
-        config:       Engine configuration (provider, models, etc.).
-
-    Returns:
-        An EngineResult containing the answer and metadata about the run.
+        company_id:   The company's unique ID.
+        company_name: The company's display name.
+        config:       Engine configuration.
+        widget_purpose: Behavioral prompt.
+        widget_key:   The widget key to isolate tool and data access.
     """
     if config is None:
         config = EngineConfig()
 
     # ── Step 1: Discover available MCP tools ──────────────────────────────
-    available_tools = list_tools(company_id)
+    if widget_key:
+        available_tools = list_tools(company_id=company_id, widget_key=widget_key)
+    else:
+        # Fallback for internal testing without a specific widget
+        available_tools = list_tools(company_id=company_id)
 
     # ── Step 2: Route the query ───────────────────────────────────────────
     decision: RoutingDecision = route_query(
@@ -180,6 +184,7 @@ def run_ai_engine(
             query=decision.rag_search_query or message,
             company_id=company_id,
             top_k=config.rag_top_k,
+            widget_key=widget_key
         )
 
     # MCP tool execution
@@ -189,6 +194,7 @@ def run_ai_engine(
             message=message,
             tool_hints=decision.mcp_tool_hints,
             available_tools=available_tools,
+            widget_key=widget_key
         )
 
     # ── Step 6: Build combined context ───────────────────────────────────
@@ -230,11 +236,11 @@ def run_ai_engine(
 # Private helpers
 # ---------------------------------------------------------------------------
 
-def _run_rag(query: str, company_id: str, top_k: int) -> list[dict]:
+def _run_rag(query: str, company_id: str, top_k: int, widget_key: str = None) -> list[dict]:
     """Run RAG retrieval and return chunks. Returns [] on error."""
     try:
         from rag_pipeline import query_documents  # relative import from backend package
-        return query_documents(query, company_id, limit=top_k)
+        return query_documents(query, company_id, limit=top_k, widget_key=widget_key)
     except Exception as e:
         print(f"WARNING: RAG retrieval failed: {e}")
         return []
@@ -245,6 +251,7 @@ def _run_mcp_tools(
     message: str,
     tool_hints: list[str],
     available_tools: list[dict],
+    widget_key: str = None
 ) -> tuple[dict[str, list[dict]], list[str]]:
     """
     Execute MCP tools based on the router's hints.
@@ -266,6 +273,7 @@ def _run_mcp_tools(
                 company_id=company_id,
                 tool_name=tool_name,
                 arguments={},  # No filters at this stage — fetch all approved data
+                widget_key=widget_key
             )
             results[tool_name] = rows
             tools_used.append(tool_name)

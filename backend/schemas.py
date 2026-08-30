@@ -123,8 +123,9 @@ class LLMConfigResponse(BaseModel):
 
 
 # --- Widget Config Schemas ---
-class WidgetConfigUpdate(BaseModel):
+class WidgetConfigCreate(BaseModel):
     company_id: str
+    name: str = "Default Widget"
     bot_name: str = "Support Assistant"
     greeting_message: str = "👋 Hi! How can I help you today?"
     placeholder_text: str = "Type your message..."
@@ -137,9 +138,25 @@ class WidgetConfigUpdate(BaseModel):
     show_branding: bool = True
     allow_attachments: bool = False
 
+class WidgetConfigUpdate(BaseModel):
+    name: str | None = None
+    bot_name: str | None = None
+    greeting_message: str | None = None
+    placeholder_text: str | None = None
+    primary_color: str | None = None
+    text_color: str | None = None
+    bg_color: str | None = None
+    user_bubble_color: str | None = None
+    bot_bubble_color: str | None = None
+    position: str | None = None
+    show_branding: bool | None = None
+    allow_attachments: bool | None = None
 
 class WidgetConfigResponse(BaseModel):
+    id: str
     company_id: str
+    widget_key: str
+    name: str
     bot_name: str
     greeting_message: str
     placeholder_text: str
@@ -210,3 +227,7 @@ class AgentReplyRequest(BaseModel):
 
 class StatusUpdateRequest(BaseModel):
     status: str
+
+class WidgetMappingUpdate(BaseModel):
+    ids: list[str]
+

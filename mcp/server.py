@@ -141,17 +141,17 @@ def health_check():
 )
 def list_tools(
     company_id: str,
+    widget_key: str | None = None,
     db: Session = Depends(get_db),
     _: bool = Depends(verify_mcp_secret),
 ):
     """
     Dynamically generate and return all tools for the given company.
-    The AI Engine calls this at the start of each conversation to know
-    what live-data capabilities are available.
+    If widget_key is provided, strictly limit tools to those approved for that widget.
     """
     _get_company_or_404(company_id, db)
 
-    tools = generate_tools_for_company(company_id, db)
+    tools = generate_tools_for_company(company_id, db, widget_key)
 
     return ListToolsResponse(
         company_id=company_id,
@@ -173,20 +173,18 @@ def list_tools(
 def execute_tool(
     company_id: str,
     request: ExecuteToolRequest,
+    widget_key: str | None = None,
     db: Session = Depends(get_db),
     _: bool = Depends(verify_mcp_secret),
 ):
     """
     Execute a named tool for the given company with the provided arguments.
-
-    The tool registry is rebuilt on every call to always reflect the latest
-    access policy — if an admin removes a table from the policy, it takes
-    effect immediately on the next request.
+    If widget_key is provided, strictly validate that this widget has access.
     """
     _get_company_or_404(company_id, db)
 
     # Rebuild tool registry fresh (always uses latest policy from DB)
-    tools = generate_tools_for_company(company_id, db)
+    tools = generate_tools_for_company(company_id, db, widget_key)
     registry = build_tool_registry(tools)
 
     if request.tool_name not in registry:

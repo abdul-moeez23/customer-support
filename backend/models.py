@@ -168,3 +168,24 @@ class Message(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     conversation = relationship("Conversation", back_populates="messages")
+
+class WidgetTableAccess(Base):
+    __tablename__ = 'widget_table_access'
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    widget_id = Column(String, ForeignKey('widget_configs.id'), nullable=False)
+    allowed_table_id = Column(String, ForeignKey('allowed_tables.id'), nullable=False)
+
+    widget = relationship('WidgetConfig')
+    allowed_table = relationship('AllowedTable')
+
+class WidgetDocumentAccess(Base):
+    __tablename__ = 'widget_document_access'
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    widget_id = Column(String, ForeignKey('widget_configs.id'), nullable=False)
+    document_id = Column(String, ForeignKey('documents.id'), nullable=False)
+
+    widget = relationship('WidgetConfig')
+    document = relationship('Document')
+
