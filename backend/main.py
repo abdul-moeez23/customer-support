@@ -153,10 +153,57 @@ def get_document_status(document_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Document not found")
     
     return {
-        "document_id": doc.id,
-        "filename": doc.filename,
-        "status": doc.status
+        "status": doc.status,
+        "filename": doc.filename
     }
+
+# Phase 9: Document Management endpoints
+@app.get("/api/documents/company/{company_id}")
+def get_company_documents(company_id: str, db: Session = Depends(get_db)):
+    docs = db.query(models.Document).filter(models.Document.company_id == company_id).all()
+    results = []
+    for doc in docs:
+        mappings = db.query(models.WidgetDocumentAccess).filter(models.WidgetDocumentAccess.document_id == doc.id).all()
+        results.append({
+            "id": doc.id,
+            "filename": doc.filename,
+            "status": doc.status,
+            "created_at": doc.created_at.isoformat() if doc.created_at else None,
+            "widget_ids": [m.widget_id for m in mappings]
+        })
+    return results
+
+@app.put("/api/documents/{document_id}/widgets")
+def update_document_widgets(document_id: str, payload: dict, db: Session = Depends(get_db)):
+    widget_ids = payload.get("widget_ids", [])
+    db.query(models.WidgetDocumentAccess).filter(models.WidgetDocumentAccess.document_id == document_id).delete()
+    for w_id in widget_ids:
+        acc = models.WidgetDocumentAccess(widget_id=w_id, document_id=document_id)
+        db.add(acc)
+    db.commit()
+    return {"status": "success"}
+
+@app.delete("/api/documents/{document_id}")
+def delete_document(document_id: str, db: Session = Depends(get_db)):
+    doc = db.query(models.Document).filter(models.Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    # Delete from Qdrant
+    try:
+        from rag_pipeline import delete_document_from_qdrant
+        delete_document_from_qdrant(document_id)
+    except Exception as e:
+        print(f"Error deleting from Qdrant: {e}")
+        
+    # Delete mappings
+    db.query(models.WidgetDocumentAccess).filter(models.WidgetDocumentAccess.document_id == document_id).delete()
+    
+    # Delete from DB
+    db.delete(doc)
+    db.commit()
+    
+    return {"status": "success"}
 
 from pydantic import BaseModel
 class RAGQuery(BaseModel):
@@ -232,12 +279,65 @@ def save_allowed_tables(request: schemas.AllowedTableCreate, db: Session = Depen
     # Clear existing policies for this connection
     db.query(models.AllowedTable).filter(models.AllowedTable.connection_id == request.connection_id).delete()
     
-    # Add new ones
-    for tb in request.tables:
-        db.add(models.AllowedTable(connection_id=request.connection_id, table_name=tb))
-        
+    # Save new policies
+    for table in request.tables:
+        new_table = models.AllowedTable(
+            connection_id=request.connection_id,
+            table_name=table
+        )
+        db.add(new_table)
     db.commit()
-    return {"status": "success", "message": "Access policy saved"}
+    return {"status": "success"}
+
+# Phase 10: Database Connection Management endpoints
+@app.get("/api/connections/database/company/{company_id}")
+def get_company_database_connections(company_id: str, db: Session = Depends(get_db)):
+    conns = db.query(models.DatabaseConnection).filter(models.DatabaseConnection.company_id == company_id).all()
+    results = []
+    for conn in conns:
+        results.append({
+            "id": conn.id,
+            "name": conn.name,
+            "db_type": conn.db_type,
+            "host": conn.host,
+            "port": conn.port,
+            "database_name": conn.database_name
+        })
+    return results
+
+@app.get("/api/connections/database/{connection_id}/widgets")
+def get_connection_widget_mappings(connection_id: str, db: Session = Depends(get_db)):
+    # Returns which widgets have access to which tables for this connection
+    allowed_tables = db.query(models.AllowedTable).filter(models.AllowedTable.connection_id == connection_id).all()
+    
+    results = []
+    for at in allowed_tables:
+        mappings = db.query(models.WidgetTableAccess).filter(models.WidgetTableAccess.allowed_table_id == at.id).all()
+        results.append({
+            "table_name": at.table_name,
+            "widget_ids": [m.widget_id for m in mappings]
+        })
+    return results
+
+@app.delete("/api/connections/database/{connection_id}")
+def delete_database_connection(connection_id: str, db: Session = Depends(get_db)):
+    conn = db.query(models.DatabaseConnection).filter(models.DatabaseConnection.id == connection_id).first()
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+        
+    # Delete related WidgetTableAccess
+    allowed_tables = db.query(models.AllowedTable).filter(models.AllowedTable.connection_id == connection_id).all()
+    allowed_table_ids = [at.id for at in allowed_tables]
+    if allowed_table_ids:
+        db.query(models.WidgetTableAccess).filter(models.WidgetTableAccess.allowed_table_id.in_(allowed_table_ids)).delete(synchronize_session=False)
+        
+    # Delete AllowedTables
+    db.query(models.AllowedTable).filter(models.AllowedTable.connection_id == connection_id).delete()
+    
+    # Delete the Connection
+    db.delete(conn)
+    db.commit()
+    return {"status": "success"}
 
 @app.post("/api/connections/api", response_model=schemas.APIConnectionResponse)
 def create_api_connection(request: schemas.APIConnectionCreate, db: Session = Depends(get_db)):
@@ -440,15 +540,17 @@ def _default_widget_config(company_id: str) -> schemas.WidgetConfigResponse:
 
 
 @app.get("/api/widget-config/{company_id}", response_model=list[schemas.WidgetConfigResponse])
-def get_widget_configs(company_id: str, db: Session = Depends(get_db)):
+def get_widget_configs(company_id: str, include_archived: bool = False, db: Session = Depends(get_db)):
     """Fetch all widget configurations for a company."""
     company = db.query(models.Company).filter(models.Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    configs = db.query(models.WidgetConfig).filter(
-        models.WidgetConfig.company_id == company_id
-    ).all()
+    query = db.query(models.WidgetConfig).filter(models.WidgetConfig.company_id == company_id)
+    if not include_archived:
+        query = query.filter(models.WidgetConfig.is_active == True)
+        
+    configs = query.all()
     
     if not configs:
         # Create a default one if none exist
@@ -500,6 +602,17 @@ def update_widget_config(widget_id: str, request: schemas.WidgetConfigUpdate, db
     db.commit()
     db.refresh(config)
     return config
+
+@app.put("/api/widget-config/{widget_id}/archive")
+def archive_widget_config(widget_id: str, active: bool = False, db: Session = Depends(get_db)):
+    """Archive or unarchive a widget configuration."""
+    config = db.query(models.WidgetConfig).filter(models.WidgetConfig.id == widget_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Widget not found")
+        
+    config.is_active = active
+    db.commit()
+    return {"status": "success", "is_active": active}
 
 from pydantic import BaseModel
 class WidgetTableMapRequest(BaseModel):

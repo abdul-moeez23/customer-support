@@ -168,6 +168,7 @@ class WidgetConfigResponse(BaseModel):
     position: str
     show_branding: bool
     allow_attachments: bool
+    is_active: bool
 
     class Config:
         from_attributes = True

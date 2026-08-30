@@ -33,8 +33,8 @@ def init_qdrant():
             )
         )
 
-def process_and_store_document(file_bytes: bytes, filename: str, company_id: str):
-    """Extracts text, chunks it, embeds it, and stores it securely tagged with company_id."""
+def process_and_store_document(file_bytes: bytes, filename: str, company_id: str, document_id: str):
+    """Extracts text, chunks it, embeds it, and stores it securely tagged with company_id and document_id."""
     
     # 1. Extract text based on file type
     text = ""
@@ -82,6 +82,7 @@ def process_and_store_document(file_bytes: bytes, filename: str, company_id: str
                 vector=embedding,
                 payload={
                     "company_id": company_id, # CRITICAL: This isolates the data!
+                    "document_id": document_id,
                     "filename": filename,
                     "text": chunk
                 }
@@ -94,6 +95,22 @@ def process_and_store_document(file_bytes: bytes, filename: str, company_id: str
     )
     
     return len(chunks)
+
+def delete_document_from_qdrant(document_id: str):
+    """Deletes all chunks associated with a document_id from Qdrant."""
+    qdrant.delete(
+        collection_name=COLLECTION_NAME,
+        points_selector=models.FilterSelector(
+            filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="document_id",
+                        match=models.MatchValue(value=document_id),
+                    ),
+                ],
+            )
+        )
+    )
 
 def query_documents(query_text: str, company_id: str, limit: int = 5, widget_key: str = None):
     """Searches Qdrant for relevant chunks, strictly isolated by company_id and optionally widget_key."""

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { MessageSquare, CheckCircle, Clock, Send, User, Bot, AlertCircle, Inbox } from "lucide-react";
 
 export default function InboxPage() {
@@ -10,26 +10,26 @@ export default function InboxPage() {
   const [replyText, setReplyText] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchConversations = async () => {
-      const companyId = localStorage.getItem("company_id");
-      if (!companyId) return;
+  const fetchConversations = useCallback(async () => {
+    const companyId = localStorage.getItem("company_id");
+    if (!companyId) return;
 
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/conversations?company_id=${companyId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setConversations(data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch conversations", err);
-      } finally {
-        setLoading(false);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/conversations?company_id=${companyId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setConversations(data);
       }
-    };
-
-    fetchConversations();
+    } catch (err) {
+      console.error("Failed to fetch conversations", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
 
   const selectConversation = async (conv: Record<string, unknown>) => {
     setSelectedConv(conv);

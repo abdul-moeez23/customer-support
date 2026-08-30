@@ -1,20 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Save, CheckCircle2, AlertCircle, Palette, Eye, Plus } from "lucide-react";
+import { Settings, Save, CheckCircle2, AlertCircle, Palette, Eye, Plus, RefreshCw } from "lucide-react";
 import { CustomSelect } from "@/components/CustomSelect";
 
 export default function WidgetSettingsPage() {
-  const [widgets, setWidgets] = useState<Record<string, unknown>[]>([]);
+  const [widgets, setWidgets] = useState<any[]>([]);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
-  const [config, setConfig] = useState<Record<string, unknown>>({
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [config, setConfig] = useState<any>({
     bot_name: "Support Assistant",
     greeting_message: "Hi! How can I help you today?",
     placeholder_text: "Type your message...",
-    primary_color: "#18181b",
+    primary_color: "#2563eb",
     text_color: "#ffffff",
     bg_color: "#ffffff",
-    user_bubble_color: "#18181b",
+    user_bubble_color: "#2563eb",
     bot_bubble_color: "#f4f4f5",
     position: "bottom-right",
     show_branding: true,
@@ -26,30 +29,36 @@ export default function WidgetSettingsPage() {
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
 
-  useEffect(() => {
-    const fetchWidgets = async () => {
-      const companyId = localStorage.getItem("company_id");
-      if (!companyId) return;
+  const fetchWidgets = async (idToSelect?: string | null) => {
+    const companyId = localStorage.getItem("company_id");
+    if (!companyId) return;
 
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${companyId}`);
-        if (res.ok) {
-          const data = await res.json();
-          // data should be an array of widgets
-          if (Array.isArray(data) && data.length > 0) {
-            setWidgets(data);
-            setActiveWidgetId(data[0].id as string);
-            setConfig(data[0]);
-          } else {
-            setWidgets([]);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${companyId}?include_archived=true`);
+      if (res.ok) {
+        const data = await res.json();
+        // data should be an array of widgets
+        if (Array.isArray(data) && data.length > 0) {
+          setWidgets(data);
+          let targetWidget = data[0];
+          if (idToSelect) {
+            const found = data.find((w: any) => w.id === idToSelect);
+            if (found) targetWidget = found;
           }
+          setActiveWidgetId(targetWidget.id as string);
+          setConfig(targetWidget);
+        } else {
+          setWidgets([]);
         }
-      } catch (err) {
-        console.error("Failed to load widgets", err);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      console.error("Failed to load widgets", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchWidgets();
   }, []);
 
@@ -74,10 +83,10 @@ export default function WidgetSettingsPage() {
         bot_name: "New Assistant",
         greeting_message: "Hi! How can I help you today?",
         placeholder_text: "Type your message...",
-        primary_color: "#18181b",
+        primary_color: "#2563eb",
         text_color: "#ffffff",
         bg_color: "#ffffff",
-        user_bubble_color: "#18181b",
+        user_bubble_color: "#2563eb",
         bot_bubble_color: "#f4f4f5",
         position: "bottom-right",
         show_branding: true,
@@ -121,21 +130,39 @@ export default function WidgetSettingsPage() {
       });
 
       if (res.ok) {
-        setMessage({ text: "Widget configuration saved!", type: "success" });
-        // Update the widget in the array
-        setWidgets(widgets.map((w) => (w.id === activeWidgetId ? { ...w, ...config } : w)));
+        setMessage({ text: "Settings saved successfully!", type: "success" });
+        fetchWidgets(activeWidgetId);
       } else {
-        setMessage({ text: "Failed to save configuration.", type: "error" });
+        setMessage({ text: "Failed to save settings.", type: "error" });
       }
     } catch (err) {
-      console.error(err);
-      setMessage({ text: "An error occurred.", type: "error" });
+      setMessage({ text: "Failed to save settings.", type: "error" });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleChange = (field: string, value: unknown) => {
+  const handleArchive = async () => {
+    if (!activeWidgetId) return;
+    setArchiving(true);
+    try {
+      const newStatus = config.is_active === false;
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${activeWidgetId}/archive?active=${newStatus}`, {
+        method: "PUT"
+      });
+      if (!res.ok) throw new Error("Failed to archive/unarchive widget");
+      setMessage({ text: `Widget ${newStatus ? 'restored' : 'archived'} successfully!`, type: "success" });
+      fetchWidgets(activeWidgetId);
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: "Failed to update widget status.", type: "error" });
+    } finally {
+      setArchiving(false);
+      setArchiveConfirmOpen(false);
+    }
+  };
+
+  const handleChange = (field: string, value: any) => {
     setConfig({ ...config, [field]: value });
   };
 
@@ -205,17 +232,31 @@ export default function WidgetSettingsPage() {
         </button>
       </div>
 
-      <div className="mb-6 flex items-center gap-4">
-        <label className="text-sm font-medium text-zinc-700">Select Widget:</label>
-        <div className="w-64">
-          <CustomSelect
-            id="widget-select"
-            value={activeWidgetId || ""}
-            onChange={handleWidgetChange}
-            options={widgets.map((w) => ({ value: w.id, label: w.bot_name || `Widget ${w.id}` }))}
-            aria-label="Select widget"
-          />
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-medium text-zinc-700">Select Widget:</label>
+          <div className="w-64">
+            <CustomSelect
+              id="widget-select"
+              value={activeWidgetId || ""}
+              onChange={handleWidgetChange}
+              options={widgets.filter(w => showArchived || w.is_active !== false).map((w) => ({ value: w.id as string, label: (w.bot_name as string || `Widget ${w.id}`) + (w.is_active === false ? " (Archived)" : "") }))}
+              aria-label="Select widget"
+            />
+          </div>
         </div>
+        
+        <label className="flex items-center gap-2 cursor-pointer group bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-200">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={e => setShowArchived(e.target.checked)}
+            className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 cursor-pointer"
+          />
+          <span className="text-sm text-zinc-700 group-hover:text-zinc-900 transition-colors font-medium">
+            Show Archived
+          </span>
+        </label>
       </div>
 
       {widgets.length === 0 ? (
@@ -286,9 +327,28 @@ export default function WidgetSettingsPage() {
 
                   {/* Colors */}
                   <div className="pt-2 border-t border-zinc-100">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Palette className="w-3.5 h-3.5 text-zinc-400" />
-                      <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Colors</h2>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Palette className="w-3.5 h-3.5 text-zinc-400" />
+                        <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Colors</h2>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfig((prev: any) => ({
+                            ...prev,
+                            primary_color: "#2563eb",
+                            text_color: "#ffffff",
+                            user_bubble_color: "#2563eb",
+                            bot_bubble_color: "#f4f4f5",
+                          }));
+                        }}
+                        className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1.5 transition-colors"
+                        title="Reset colors to default"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Reset Defaults</span>
+                      </button>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       {renderColorInput("Primary (Header)", "primary_color")}
@@ -329,7 +389,26 @@ export default function WidgetSettingsPage() {
                   )}
                 </div>
 
-                <div className="px-6 py-4 bg-zinc-50/50 border-t border-zinc-100 flex justify-end rounded-b-xl">
+                <div className="px-6 py-4 bg-zinc-50/50 border-t border-zinc-100 flex items-center justify-between rounded-b-xl">
+                  {config.is_active === false ? (
+                    <button
+                      type="button"
+                      onClick={handleArchive}
+                      disabled={archiving}
+                      className="flex items-center gap-2 px-4 py-2 bg-zinc-200 text-zinc-700 rounded-lg text-sm font-semibold hover:bg-zinc-300 transition-all disabled:opacity-50"
+                    >
+                      {archiving ? "Restoring..." : "Restore Widget"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setArchiveConfirmOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-100 transition-all"
+                    >
+                      Archive Widget
+                    </button>
+                  )}
+
                   <button
                     type="submit"
                     disabled={saving}
@@ -423,6 +502,31 @@ export default function WidgetSettingsPage() {
                   Powered by Orchestrator
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Archive Modal */}
+      {archiveConfirmOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-xl w-full max-w-sm">
+            <h2 className="text-lg font-bold text-zinc-900 mb-2">Archive Widget</h2>
+            <p className="text-sm text-zinc-500 mb-6">Are you sure you want to archive this widget? Archiving hides it from the default list and disables it, but preserves its chat history. You can restore it later by checking &quot;Show Archived&quot;.</p>
+            
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setArchiveConfirmOpen(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-600 hover:bg-zinc-50 border border-zinc-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleArchive}
+                disabled={archiving}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              >
+                {archiving ? "Archiving..." : "Archive"}
+              </button>
             </div>
           </div>
         </div>

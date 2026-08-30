@@ -25,3 +25,4 @@ httpx==0.27.0              # MCP server HTTP client
 anthropic==0.25.0          # Anthropic Claude (optional — only needed if using Claude)
 google-generativeai==0.5.4 # Google Gemini  (optional — only needed if using Gemini)
 alembic==1.13.1
+watchfiles==0.21.0

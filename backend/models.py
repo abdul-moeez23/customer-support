@@ -136,6 +136,7 @@ class WidgetConfig(Base):
     # Features
     show_branding = Column(Boolean, nullable=False, default=True)        # "Powered by AI Support"
     allow_attachments = Column(Boolean, nullable=False, default=False)
+    is_active = Column(Boolean, nullable=False, default=True)            # Soft delete (Phase 11)
 
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
