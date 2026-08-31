@@ -107,15 +107,16 @@ class ChatResponse(BaseModel):
 # --- LLM Config Schemas ---
 class LLMConfigUpdate(BaseModel):
     company_id: str
+    name: str = "Default"
     provider: str   # "openai" | "anthropic" | "gemini"
-    model: str | None = None
     api_key: str | None = None # plain text from frontend, encrypted before saving
 
 
 class LLMConfigResponse(BaseModel):
+    id: str
     company_id: str
+    name: str
     provider: str
-    model: str | None
     has_api_key: bool = False
 
     class Config:
@@ -137,6 +138,8 @@ class WidgetConfigCreate(BaseModel):
     position: str = "bottom-right"
     show_branding: bool = True
     allow_attachments: bool = False
+    llm_config_id: str | None = None
+    llm_model: str | None = None
 
 class WidgetConfigUpdate(BaseModel):
     name: str | None = None
@@ -151,6 +154,8 @@ class WidgetConfigUpdate(BaseModel):
     position: str | None = None
     show_branding: bool | None = None
     allow_attachments: bool | None = None
+    llm_config_id: str | None = None
+    llm_model: str | None = None
 
 class WidgetConfigResponse(BaseModel):
     id: str
@@ -169,6 +174,8 @@ class WidgetConfigResponse(BaseModel):
     show_branding: bool
     allow_attachments: bool
     is_active: bool
+    llm_config_id: str | None
+    llm_model: str | None
 
     class Config:
         from_attributes = True

@@ -64,7 +64,7 @@ Based on the requirements and tech stack provided, here is the phased implementa
 - [x] **Frontend (`frontend/`):** Build an inbox in the dashboard (`/dashboard/inbox`) for company agents to view and reply to escalated chats.
 - [x] **Milestone 7:** Full end-to-end support workflow including AI deflection and human escalation.
 
-### [ ] Phase 8: Multi-Widget Data Segregation (Widget-Level Access Control)
+### [x] Phase 8: Multi-Widget Data Segregation (Widget-Level Access Control)
 **Goal:** Allow companies to create multiple widgets and restrict specific databases and knowledge base documents to specific widgets.
 - [x] **Step 1: Database Schema Updates:** Add `WidgetTableAccess` and `WidgetDocumentAccess` mapping tables to `models.py` and run Alembic migrations.
 - [x] **Step 2: API Updates:** Refactor `/api/widget-config` to support CRUD operations for multiple widgets per company, and endpoints to manage widget-data mappings.
@@ -124,3 +124,70 @@ Based on the requirements and tech stack provided, here is the phased implementa
   - Update the "Select Widget" dropdown to visually indicate archived widgets (e.g., "(Archived)") or filter them out unless a "Show Archived" toggle is checked.
   - Add an "Archive Widget" button at the bottom of the widget settings form (styled differently from the Save button, perhaps a muted red or outlined gray button).
   - Add a confirmation modal (similar to the ones designed in Phase 9/10) to confirm archiving, explaining that it hides the widget but preserves history.can find and re-activate hidden widgets.
+
+### [x] Phase 12: Per-Widget AI Settings (Provider & Model)
+**Goal:** Transition from a global company-wide LLM model configuration to a per-widget AI configuration, allowing different widgets to utilize different models and providers based on their specific use cases (e.g. GPT-4o for complex support vs Gemini Flash for simple lead capture), while maintaining a global credential vault for API keys.
+- [x] **Step 1: Database Schema Updates (`backend/models.py`)**
+  - Update `LLMConfig`: Remove `unique=True` from `company_id`. Add a `UniqueConstraint('company_id', 'provider')`. Remove `model` column. `LLMConfig` now acts purely as an API key vault for each provider.
+  - Update `WidgetConfig`: Add `llm_provider` (default 'openai') and `llm_model` (nullable) columns to store the AI preference per widget.
+  - Run Alembic migration to apply these changes.
+- [x] **Step 2: API & Schema Updates (`backend/schemas.py`, `backend/main.py`)**
+  - Update `LLMConfigUpdate` and `LLMConfigResponse` schemas to handle API keys per provider without requiring the `model`.
+  - Update `WidgetConfigCreate`, `WidgetConfigUpdate`, and `WidgetConfigResponse` schemas to include `llm_provider` and `llm_model`.
+  - Update `POST /api/llm-config` to upsert by `(company_id, provider)` instead of just `company_id`.
+  - Update `GET /api/llm-config/{company_id}` to return a list of configured providers and their API key status (e.g., `List[LLMConfigResponse]`).
+  - Update `POST /api/widget-config/create` and `PUT /api/widget-config/{widget_id}` to accept and save `llm_provider` and `llm_model`.
+- [x] **Step 3: AI Engine Update (`backend/engine.py` or similar)**
+  - When a chat request comes in via `WidgetChatRequest` (which contains `widget_key`), fetch the `WidgetConfig` to determine the chosen `llm_provider` and `llm_model`.
+  - Then, query `LLMConfig` for the matching `company_id` and `provider` to retrieve the decrypted API key.
+  - Pass the widget-specific model and provider to the LLM SDKs.
+- [x] **Step 4: Frontend UI Updates (`frontend/src/app/dashboard/ai-settings/page.tsx` & `widget-settings/page.tsx`)**
+  - **`ai-settings/page.tsx`**: Remove the "Model" input field. Refactor the page to act as a global "API Keys Vault" where users can input and save their API keys for multiple providers (OpenAI, Gemini, Anthropic).
+  - **`widget-settings/page.tsx`**: Add an "AI Configuration" section within the widget settings form containing dropdowns for "LLM Provider" and "Model". Populate the provider dropdown with the providers configured in the global AI Settings.
+
+### [x] Phase 13: Multiple Named API Keys Support
+**Goal:** Allow companies to configure multiple API keys for the same provider (e.g., separate billing accounts for Sales vs Support) by naming them, and link widgets to a specific named key configuration rather than just a generic provider string.
+- [x] **Step 3: AI Engine Integration (`backend/main.py`)**
+  - In `/api/widget-chat` and `/api/chat`: Fetch the specific `LLMConfig` using the widget's `llm_config_id`.
+  - Extract the specific `provider` and `api_key` from that config, and pass them into `EngineConfig`.
+  - Add fallback logic: If a widget has no `llm_config_id` set, either fallback to the first available company key or return a clear error.
+- [x] **Step 4: Frontend UI Updates (`frontend/src/app/dashboard/ai-settings/page.tsx` & `widget-settings/page.tsx`)**
+  - **`ai-settings/page.tsx`**: Redesign to show a list/table of saved named keys (e.g., "Support Team OpenAI", "Sales Gemini"). Add a form/modal to add new keys (Name, Provider, API Key) and delete existing ones.
+  - **`widget-settings/page.tsx`**: Update the "AI Configuration" section. The dropdown should now display the company's specific named keys instead of generic providers. Save the selected key's `id` as `llm_config_id`.
+
+### [ ] Phase 14: Hybrid Database Connection UI (Raw Connection String Support)
+**Goal:** Enhance the UX by allowing users to paste a single, fully-formatted database connection string (URI) instead of manually filling out individual fields (Host, Port, Username, etc.). The system will parse the string to maintain compatibility with the existing database schema and driver-restricted dropdown logic.
+- [ ] **Step 1: Backend API Refactoring (`backend/schemas.py`, `backend/main.py`)**
+  - Update `DBConnectionCreate` schema to make `host`, `port`, `username`, `password`, and `database_name` optional if a new `connection_string` field is provided.
+  - In `POST /api/connections/database`, add parsing logic using SQLAlchemy's `make_url` to extract the individual fields from the `connection_string` (if provided).
+  - Validate that the parsed protocol matches the selected `db_type` from the UI dropdown (e.g., `postgresql://` matches `postgres`) to guarantee driver compatibility.
+  - Save the parsed fields to the existing `DatabaseConnection` database model (no Alembic migrations required).
+- [ ] **Step 2: Frontend UI Updates (`frontend/src/app/dashboard/db-connections/page.tsx`)**
+  - Keep the existing "Type" dropdown to enforce safe driver selection.
+  - Add a toggle switch or tab system inside the connection form: "Standard Form" vs "Use Connection String".
+  - If "Use Connection String" is selected, hide the individual input boxes and show a single text input for the URI.
+  - Update the submit handler to send the `connection_string` payload to the backend when the toggle is active.
+
+### [ ] Phase 15: Microsoft SQL Server (MSSQL) Support
+**Goal:** Expand the platform's enterprise reach by supporting Microsoft SQL Server, integrating seamlessly into the existing SQLAlchemy architecture.
+- [ ] **Step 1: Dependency Updates**
+  - Add `pymssql` to both `backend/requirements.txt` and `mcp/requirements.txt`.
+- [ ] **Step 2: Connection Logic (`backend/connectors.py` & `mcp/executor.py`)**
+  - In `connectors.py`, add `elif db_type == "sqlserver":` and format the connection URL as `mssql+pymssql://{username}:{password}@{host}:{port}/{database_name}`.
+  - Replicate this URL construction in `mcp/executor.py`'s `_build_connection_url` function to enable live MCP querying.
+- [ ] **Step 3: Frontend UI (`frontend/src/app/dashboard/db-connections/page.tsx`)**
+  - Add "Microsoft SQL Server" (with value `sqlserver`) to the Database Type dropdown menu.
+
+### [ ] Phase 16: MongoDB (NoSQL) Support & Architecture Update
+**Goal:** Introduce support for MongoDB. Since it is a NoSQL database, this phase requires bypassing SQLAlchemy and introducing specialized connection logic and AI prompt handling for NoSQL aggregation pipelines.
+- [ ] **Step 1: Dependency Updates**
+  - Add `pymongo` to both `backend/requirements.txt` and `mcp/requirements.txt`.
+- [ ] **Step 2: NoSQL Connection Logic (`backend/connectors.py` & `backend/main.py`)**
+  - Create a new function `test_mongo_connection_and_get_collections` using `pymongo.MongoClient` to authenticate and fetch a list of collection names (since MongoDB has no "tables").
+  - Update the `/api/connections/database` route to call this new function instead of the SQLAlchemy function when `db_type == "mongodb"`.
+- [ ] **Step 3: MCP NoSQL Tool (`mcp/executor.py` & `mcp/tools.py`)**
+  - Create a new, dedicated MCP tool (e.g., `execute_mongo_query`) that accepts and executes MongoDB JSON queries/aggregation pipelines via `pymongo`, completely separate from the existing SQL execution tool.
+- [ ] **Step 4: AI Engine Routing & Prompting**
+  - Update the AI Query Router to detect the `db_type` of the requested widget. If it is `mongodb`, the system prompt must explicitly instruct the LLM to generate MongoDB syntax (JSON) instead of SQL.
+- [ ] **Step 5: Frontend UI (`frontend/src/app/dashboard/db-connections/page.tsx`)**
+  - Add "MongoDB" (with value `mongodb`) to the Database Type dropdown menu.

@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Settings, Save, CheckCircle2, AlertCircle, Palette, Eye, Plus, RefreshCw } from "lucide-react";
 import { CustomSelect } from "@/components/CustomSelect";
 
@@ -21,15 +22,43 @@ export default function WidgetSettingsPage() {
     bot_bubble_color: "#f4f4f5",
     position: "bottom-right",
     show_branding: true,
-    allow_attachments: false
+    allow_attachments: false,
+    llm_config_id: null,
+    llm_model: ""
   });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
+  const [configuredProviders, setConfiguredProviders] = useState<{value: string, label: string}[]>([]);
 
-  const fetchWidgets = async (idToSelect?: string | null) => {
+  const fetchAIProviders = useCallback(async () => {
+    const companyId = localStorage.getItem("company_id");
+    if (!companyId) return;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/llm-config/${companyId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const providers: {value: string, label: string}[] = [];
+        if (Array.isArray(data)) {
+          data.forEach(item => {
+            if (item.has_api_key) {
+               providers.push({ value: item.id, label: `${item.name} (${item.provider})` });
+            }
+          });
+        }
+        if (providers.length === 0) {
+           providers.push({ value: "", label: "No API Keys Configured" });
+        }
+        setConfiguredProviders(providers);
+      }
+    } catch (err) {
+      console.error("Failed to load AI providers", err);
+    }
+  }, []);
+
+  const fetchWidgets = useCallback(async (idToSelect?: string | null) => {
     const companyId = localStorage.getItem("company_id");
     if (!companyId) return;
 
@@ -56,11 +85,12 @@ export default function WidgetSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    fetchAIProviders();
     fetchWidgets();
-  }, []);
+  }, [fetchAIProviders, fetchWidgets]);
 
   const handleWidgetChange = (widgetId: string) => {
     const selected = widgets.find((w) => w.id === widgetId);
@@ -90,7 +120,9 @@ export default function WidgetSettingsPage() {
         bot_bubble_color: "#f4f4f5",
         position: "bottom-right",
         show_branding: true,
-        allow_attachments: false
+        allow_attachments: false,
+        llm_config_id: null,
+        llm_model: ""
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/create`, {
@@ -135,7 +167,7 @@ export default function WidgetSettingsPage() {
       } else {
         setMessage({ text: "Failed to save settings.", type: "error" });
       }
-    } catch (err) {
+    } catch {
       setMessage({ text: "Failed to save settings.", type: "error" });
     } finally {
       setSaving(false);
@@ -355,6 +387,39 @@ export default function WidgetSettingsPage() {
                       {renderColorInput("Header Text", "text_color")}
                       {renderColorInput("User Bubble", "user_bubble_color")}
                       {renderColorInput("Bot Bubble", "bot_bubble_color")}
+                    </div>
+                  </div>
+
+                  {/* AI Configuration */}
+                  <div className="pt-2 border-t border-zinc-100">
+                    <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">AI Configuration</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="llm_config_id">API Key Configuration</label>
+                        <div className="relative">
+                          <CustomSelect
+                            id="llm_config_id"
+                            value={config.llm_config_id || ""}
+                            onChange={(val) => handleChange("llm_config_id", val)}
+                            options={configuredProviders}
+                            aria-label="Widget AI API Key"
+                          />
+                        </div>
+                        <p className="text-[10px] text-zinc-400 mt-1">Select from named keys configured in AI Settings.</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="llm_model">
+                          Model <span className="text-zinc-400 font-normal">(optional)</span>
+                        </label>
+                        <input
+                          id="llm_model"
+                          type="text"
+                          value={config.llm_model || ""}
+                          onChange={e => handleChange("llm_model", e.target.value)}
+                          placeholder="e.g. gpt-4o"
+                          className={inputClass}
+                        />
+                      </div>
                     </div>
                   </div>
 

@@ -94,29 +94,29 @@ embeddings = model.encode(chunks).tolist()
 To execute this architectural shift, the following step-by-step implementation plan should be followed:
 
 ### Step 1: Infrastructure Setup (`docker-compose.yml`)
-*   Add **Redis** container (`redis:alpine`).
-*   Add **MinIO** container (`minio/minio`) and expose API port `9000` and Console port `9001`.
-*   Add a **Celery Worker** container (building from the backend `Dockerfile`, but overriding the command to start celery: `celery -A worker app worker --loglevel=info`).
+* [x] Add **Redis** container (`redis:alpine`).
+* [x] Add **MinIO** container (`minio/minio`) and expose API port `9000` and Console port `9001`.
+* [x] Add a **Celery Worker** container (building from the backend `Dockerfile`, but overriding the command to start celery: `celery -A worker app worker --loglevel=info`).
 
 ### Step 2: MinIO & Encryption Integration (Backend)
-*   Install required packages in `requirements.txt`: `boto3`, `cryptography`.
-*   Create a `storage.py` utility to handle AES-256 GCM encryption.
-*   Create S3 wrapper functions (`upload_to_minio`, `download_from_minio`) using the specific `endpoint_url` and `forcePathStyle` settings.
+* [x] Install required packages in `requirements.txt`: `boto3`, `cryptography`.
+* [x] Create a `storage.py` utility to handle AES-256 GCM encryption.
+* [x] Create S3 wrapper functions (`upload_to_minio`, `download_from_minio`) using the specific `endpoint_url` and `forcePathStyle` settings.
 
 ### Step 3: Celery Broker & Task Definition
-*   Install `celery` and `redis`.
-*   Initialize the Celery application in `backend/worker.py` pointing to the Redis broker URL (`redis://redis:6379/0`).
-*   Move the `process_and_store_document` logic out of the synchronous `/api/documents` route and into a `@celery.task` decorator.
+* [x] Install `celery` and `redis`.
+* [x] Initialize the Celery application in `backend/worker.py` pointing to the Redis broker URL (`redis://redis:6379/0`).
+* [x] Move the `process_and_store_document` logic out of the synchronous `/api/documents` route and into a `@celery.task` decorator.
 
 ### Step 4: Local Embedding Switch
-*   Install `sentence-transformers` and `torch`.
-*   Refactor the vector generation inside the Celery task to use `all-MiniLM-L6-v2` instead of the `openai` client.
-*   Update the Qdrant connection payload to match the new vector size (`384` for all-MiniLM-L6-v2, rather than OpenAI's `1536`).
+* [x] Install `sentence-transformers` and `torch`.
+* [x] Refactor the vector generation inside the Celery task to use `all-MiniLM-L6-v2` instead of the `openai` client.
+* [x] Update the Qdrant connection payload to match the new vector size (`384` for all-MiniLM-L6-v2, rather than OpenAI's `1536`).
 
 ### Step 5: Database & API Refactoring
-*   Update the PostgreSQL `documents` schema to include `status` (`pending`, `processing`, `completed`, `failed`) and `s3_url`.
-*   Modify `/api/documents` to simply encrypt, upload to MinIO, save the DB record, dispatch the Celery task (`task.delay(doc_id)`), and return immediately.
+* [x] Update the PostgreSQL `documents` schema to include `status` (`pending`, `processing`, `completed`, `failed`) and `s3_url`.
+* [x] Modify `/api/documents` to simply encrypt, upload to MinIO, save the DB record, dispatch the Celery task (`task.delay(doc_id)`), and return immediately.
 
 ### Step 6: Frontend Status Polling
-*   Update the Next.js `KnowledgeBasePage` upload flow.
-*   Instead of waiting for the upload request to finish completely, the UI should show a "Processing in Background" state and occasionally poll a new `/api/documents/status` route to check if the Celery task has finished.
+* [x] Update the Next.js `KnowledgeBasePage` upload flow.
+* [x] Instead of waiting for the upload request to finish completely, the UI should show a "Processing in Background" state and occasionally poll a new `/api/documents/status` route to check if the Celery task has finished.

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -93,11 +93,10 @@ class LLMConfig(Base):
     __tablename__ = "llm_configs"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    company_id = Column(String, ForeignKey("companies.id"), unique=True, nullable=False)
+    company_id = Column(String, ForeignKey("companies.id"), nullable=False)
+    name = Column(String, nullable=False, default="Default")
     # e.g. "openai", "anthropic", "gemini"
     provider = Column(String, nullable=False, default="openai")
-    # e.g. "gpt-4o-mini", "claude-3-haiku-20240307", "gemini-1.5-flash"
-    model = Column(String, nullable=True)
     encrypted_api_key = Column(String, nullable=True) # NEVER STORE PLAIN TEXT
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -137,6 +136,9 @@ class WidgetConfig(Base):
     show_branding = Column(Boolean, nullable=False, default=True)        # "Powered by AI Support"
     allow_attachments = Column(Boolean, nullable=False, default=False)
     is_active = Column(Boolean, nullable=False, default=True)            # Soft delete (Phase 11)
+
+    llm_config_id = Column(String, ForeignKey("llm_configs.id"), nullable=True)
+    llm_model = Column(String, nullable=True)
 
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

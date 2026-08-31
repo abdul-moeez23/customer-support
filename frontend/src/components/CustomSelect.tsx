@@ -77,6 +77,7 @@ export function CustomSelect({
         role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={`${id}-listbox`}
         aria-label={ariaLabel}
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={handleKeyDown}
@@ -97,6 +98,7 @@ export function CustomSelect({
       {/* Dropdown */}
       {open && (
         <div
+          id={`${id}-listbox`}
           role="listbox"
           aria-label={ariaLabel}
           className="absolute z-50 mt-1.5 w-full min-w-max bg-white border border-zinc-200 rounded-xl shadow-lg shadow-zinc-200/60 py-1.5 overflow-hidden"

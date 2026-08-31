@@ -367,6 +367,21 @@ def save_allowed_endpoints(request: schemas.AllowedEndpointCreate, db: Session =
     db.commit()
     return {"status": "success", "message": "Access policy saved"}
 
+@app.get("/api/connections/api/{company_id}")
+def get_api_connections(company_id: str, db: Session = Depends(get_db)):
+    connections = db.query(models.APIConnection).filter(models.APIConnection.company_id == company_id).all()
+    result = []
+    for c in connections:
+        endpoints = db.query(models.AllowedEndpoint).filter(models.AllowedEndpoint.connection_id == c.id).all()
+        result.append({
+            "id": c.id,
+            "name": c.name,
+            "base_url": c.base_url,
+            "auth_type": c.auth_type,
+            "endpoints": [{"path": e.path, "method": e.method, "description": e.description} for e in endpoints]
+        })
+    return result
+
 
 # =============================================================================
 # Phase 5: AI Engine & Query Router
@@ -396,25 +411,31 @@ def chat_with_ai(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    # Load company's LLM config (fallback to openai if not configured)
-    llm_config = (
-        db.query(models.LLMConfig)
-        .filter(models.LLMConfig.company_id == request.company_id)
-        .first()
-    )
+    # Load company's LLM config
+    if request.provider:
+        llm_config = db.query(models.LLMConfig).filter(
+            models.LLMConfig.company_id == request.company_id, 
+            models.LLMConfig.provider == request.provider
+        ).first()
+    else:
+        llm_config = db.query(models.LLMConfig).filter(
+            models.LLMConfig.company_id == request.company_id
+        ).first()
 
-    # Request-level overrides take precedence over saved config
-    provider = request.provider or (llm_config.provider if llm_config else "openai")
-    model = request.model or (llm_config.model if llm_config else None)
+    if not llm_config:
+        raise HTTPException(status_code=400, detail="No AI configuration is available for this company.")
 
+    provider = llm_config.provider
     if provider not in VALID_PROVIDERS:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid provider '{provider}'. Choose from: {list(VALID_PROVIDERS)}"
         )
 
+    model = request.model or None
+
     api_key = None
-    if llm_config and llm_config.encrypted_api_key:
+    if llm_config.encrypted_api_key:
         from encryption import decrypt
         api_key = decrypt(llm_config.encrypted_api_key)
 
@@ -438,34 +459,33 @@ def chat_with_ai(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     )
 
 
-@app.get("/api/llm-config/{company_id}", response_model=schemas.LLMConfigResponse)
+@app.get("/api/llm-config/{company_id}", response_model=list[schemas.LLMConfigResponse])
 def get_llm_config(company_id: str, db: Session = Depends(get_db)):
     """Fetch the saved LLM provider configuration for a company."""
     company = db.query(models.Company).filter(models.Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    config = (
+    configs = (
         db.query(models.LLMConfig)
         .filter(models.LLMConfig.company_id == company_id)
-        .first()
+        .all()
     )
 
-    if not config:
-        # Return default if not configured yet
-        return schemas.LLMConfigResponse(company_id=company_id, provider="openai", model=None, has_api_key=False)
-
-    return schemas.LLMConfigResponse(
-        company_id=company_id, 
-        provider=config.provider, 
-        model=config.model, 
-        has_api_key=bool(config.encrypted_api_key)
-    )
+    return [
+        schemas.LLMConfigResponse(
+            id=c.id,
+            company_id=company_id, 
+            name=c.name,
+            provider=c.provider, 
+            has_api_key=bool(c.encrypted_api_key)
+        ) for c in configs
+    ]
 
 
 @app.post("/api/llm-config", response_model=schemas.LLMConfigResponse)
-def save_llm_config(request: schemas.LLMConfigUpdate, db: Session = Depends(get_db)):
-    """Save or update the LLM provider configuration for a company."""
+def create_llm_config(request: schemas.LLMConfigUpdate, db: Session = Depends(get_db)):
+    """Create a new named LLM provider configuration for a company."""
     company = db.query(models.Company).filter(models.Company.id == request.company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -476,39 +496,65 @@ def save_llm_config(request: schemas.LLMConfigUpdate, db: Session = Depends(get_
             detail=f"Invalid provider. Choose from: {list(VALID_PROVIDERS)}"
         )
 
-    config = (
-        db.query(models.LLMConfig)
-        .filter(models.LLMConfig.company_id == request.company_id)
-        .first()
-    )
-
     enc_api_key = None
     if request.api_key:
         from encryption import encrypt
         enc_api_key = encrypt(request.api_key)
 
-    if config:
-        config.provider = request.provider
-        config.model = request.model
-        if enc_api_key:
-            config.encrypted_api_key = enc_api_key
-    else:
-        config = models.LLMConfig(
-            company_id=request.company_id,
-            provider=request.provider,
-            model=request.model,
-            encrypted_api_key=enc_api_key
-        )
-        db.add(config)
+    config = models.LLMConfig(
+        company_id=request.company_id,
+        name=request.name,
+        provider=request.provider,
+        encrypted_api_key=enc_api_key
+    )
+    db.add(config)
+    db.commit()
+    db.refresh(config)
+    
+    return schemas.LLMConfigResponse(
+        id=config.id,
+        company_id=config.company_id, 
+        name=config.name,
+        provider=config.provider, 
+        has_api_key=bool(config.encrypted_api_key)
+    )
 
+
+@app.put("/api/llm-config/{config_id}", response_model=schemas.LLMConfigResponse)
+def update_llm_config(config_id: str, request: schemas.LLMConfigUpdate, db: Session = Depends(get_db)):
+    """Update an existing named LLM provider configuration."""
+    config = db.query(models.LLMConfig).filter(models.LLMConfig.id == config_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Config not found")
+        
+    if request.name:
+        config.name = request.name
+        
+    if request.api_key:
+        from encryption import encrypt
+        config.encrypted_api_key = encrypt(request.api_key)
+        
     db.commit()
     db.refresh(config)
     return schemas.LLMConfigResponse(
+        id=config.id,
         company_id=config.company_id, 
+        name=config.name,
         provider=config.provider, 
-        model=config.model, 
         has_api_key=bool(config.encrypted_api_key)
     )
+
+
+@app.delete("/api/llm-config/{config_id}")
+def delete_llm_config(config_id: str, db: Session = Depends(get_db)):
+    """Delete an LLM provider configuration."""
+    config = db.query(models.LLMConfig).filter(models.LLMConfig.id == config_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Config not found")
+        
+    db.delete(config)
+    db.commit()
+    return {"status": "success"}
 
 
 @app.get("/api/ai/providers")
@@ -791,16 +837,26 @@ def widget_chat(request: schemas.WidgetChatRequest, db: Session = Depends(get_db
     )
     db.add(user_msg)
 
-    # Load company LLM config
-    llm_config = db.query(models.LLMConfig).filter(
-        models.LLMConfig.company_id == company.id
-    ).first()
+    # Load widget AI settings
+    if config.llm_config_id:
+        llm_config = db.query(models.LLMConfig).filter(
+            models.LLMConfig.id == config.llm_config_id,
+            models.LLMConfig.company_id == company.id
+        ).first()
+    else:
+        # Fallback to first available company key
+        llm_config = db.query(models.LLMConfig).filter(
+            models.LLMConfig.company_id == company.id
+        ).first()
+        
+    if not llm_config:
+        raise HTTPException(status_code=400, detail="No AI configuration is available for this widget.")
+        
+    provider = llm_config.provider
+    model = config.llm_model
 
-    provider = llm_config.provider if llm_config else "openai"
-    model = llm_config.model if llm_config else None
-    
     api_key = None
-    if llm_config and llm_config.encrypted_api_key:
+    if llm_config.encrypted_api_key:
         from encryption import decrypt
         api_key = decrypt(llm_config.encrypted_api_key)
 
