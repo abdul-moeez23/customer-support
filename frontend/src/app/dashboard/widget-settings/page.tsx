@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Settings, Save, CheckCircle2, AlertCircle, Palette, Eye, Plus, RefreshCw } from "lucide-react";
+import { Settings, Save, CheckCircle2, AlertCircle, Palette, Eye, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { CustomSelect } from "@/components/CustomSelect";
 
 export default function WidgetSettingsPage() {
@@ -11,6 +11,9 @@ export default function WidgetSettingsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [config, setConfig] = useState<any>({
     bot_name: "Support Assistant",
     greeting_message: "Hi! How can I help you today?",
@@ -191,6 +194,34 @@ export default function WidgetSettingsPage() {
     } finally {
       setArchiving(false);
       setArchiveConfirmOpen(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!activeWidgetId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${activeWidgetId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete widget");
+      setMessage({ text: "Widget deleted permanently!", type: "success" });
+      
+      const remainingWidgets = widgets.filter(w => w.id !== activeWidgetId);
+      if (remainingWidgets.length > 0) {
+        setActiveWidgetId(remainingWidgets[0].id);
+        setConfig(remainingWidgets[0]);
+      } else {
+        setActiveWidgetId(null);
+      }
+      setWidgets(remainingWidgets);
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: "Failed to delete widget.", type: "error" });
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmOpen(false);
+      setDeleteInput("");
     }
   };
 
@@ -455,24 +486,35 @@ export default function WidgetSettingsPage() {
                 </div>
 
                 <div className="px-6 py-4 bg-zinc-50/50 border-t border-zinc-100 flex items-center justify-between rounded-b-xl">
-                  {config.is_active === false ? (
+                  <div className="flex items-center gap-3">
+                    {config.is_active === false ? (
+                      <button
+                        type="button"
+                        onClick={handleArchive}
+                        disabled={archiving}
+                        className="flex items-center gap-2 px-4 py-2 bg-zinc-200 text-zinc-700 rounded-lg text-sm font-semibold hover:bg-zinc-300 transition-all disabled:opacity-50"
+                      >
+                        {archiving ? "Restoring..." : "Restore Widget"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setArchiveConfirmOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-100 transition-all"
+                      >
+                        Archive Widget
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={handleArchive}
-                      disabled={archiving}
-                      className="flex items-center gap-2 px-4 py-2 bg-zinc-200 text-zinc-700 rounded-lg text-sm font-semibold hover:bg-zinc-300 transition-all disabled:opacity-50"
+                      onClick={() => { setDeleteConfirmOpen(true); setDeleteInput(""); }}
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all ml-1"
+                      title="Permanently Delete Widget"
                     >
-                      {archiving ? "Restoring..." : "Restore Widget"}
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Delete</span>
                     </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setArchiveConfirmOpen(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-100 transition-all"
-                    >
-                      Archive Widget
-                    </button>
-                  )}
+                  </div>
 
                   <button
                     type="submit"
@@ -571,10 +613,49 @@ export default function WidgetSettingsPage() {
           </div>
         </div>
       )}
+      {/* Delete Modal */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-xl w-full max-w-md">
+            <h2 className="text-lg font-bold text-red-600 mb-2">Permanent Delete</h2>
+            <p className="text-sm text-zinc-500 mb-4">Are you sure you want to permanently delete this widget? This action cannot be undone and all associated data will be removed.</p>
+            
+            <div className="mb-6">
+              <label className="block text-xs font-medium text-zinc-700 mb-2">
+                Type <strong>delete</strong> to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+                placeholder="delete"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-600 hover:bg-zinc-50 border border-zinc-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting || deleteInput.trim().toLowerCase() !== "delete"}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? "Deleting..." : "Delete Permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Archive Modal */}
       {archiveConfirmOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-xl w-full max-w-sm">
+          <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-xl w-full max-w-md">
             <h2 className="text-lg font-bold text-zinc-900 mb-2">Archive Widget</h2>
             <p className="text-sm text-zinc-500 mb-6">Are you sure you want to archive this widget? Archiving hides it from the default list and disables it, but preserves its chat history. You can restore it later by checking &quot;Show Archived&quot;.</p>
             

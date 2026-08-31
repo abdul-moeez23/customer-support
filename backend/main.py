@@ -660,6 +660,21 @@ def archive_widget_config(widget_id: str, active: bool = False, db: Session = De
     db.commit()
     return {"status": "success", "is_active": active}
 
+@app.delete("/api/widget-config/{widget_id}")
+def delete_widget_config(widget_id: str, db: Session = Depends(get_db)):
+    """Permanently delete a widget configuration and its access mappings."""
+    config = db.query(models.WidgetConfig).filter(models.WidgetConfig.id == widget_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Widget not found")
+        
+    # Explicitly delete associated rows in widget_table_access and widget_document_access
+    db.query(models.WidgetTableAccess).filter(models.WidgetTableAccess.widget_id == widget_id).delete()
+    db.query(models.WidgetDocumentAccess).filter(models.WidgetDocumentAccess.widget_id == widget_id).delete()
+    
+    db.delete(config)
+    db.commit()
+    return {"status": "success"}
+
 from pydantic import BaseModel
 class WidgetTableMapRequest(BaseModel):
     connection_id: str
@@ -742,6 +757,9 @@ def get_public_widget_config(widget_key: str, db: Session = Depends(get_db)):
         models.WidgetConfig.widget_key == widget_key
     ).first()
 
+    if config and not config.is_active:
+        raise HTTPException(status_code=403, detail="This widget is archived and currently unavailable.")
+
     if not config:
         # Return defaults
         return schemas.PublicWidgetConfigResponse(
@@ -808,6 +826,9 @@ def widget_chat(request: schemas.WidgetChatRequest, db: Session = Depends(get_db
     ).first()
     if not config:
         raise HTTPException(status_code=404, detail="Invalid widget key")
+        
+    if not config.is_active:
+        raise HTTPException(status_code=403, detail="This widget is archived and cannot process messages.")
         
     company = db.query(models.Company).filter(models.Company.id == config.company_id).first()
 
