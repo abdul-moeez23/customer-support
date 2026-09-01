@@ -1,12 +1,33 @@
-/* eslint-disable react-hooks/set-state-in-effect, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/set-state-in-effect, @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Settings, Save, CheckCircle2, AlertCircle, Palette, Eye, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Settings, Save, CheckCircle2, AlertCircle, Palette, Eye, Plus, RefreshCw, Trash2, Copy, Check } from "lucide-react";
 import { CustomSelect } from "@/components/CustomSelect";
 
+interface WidgetConfig {
+  id?: string;
+  company_id?: string;
+  widget_key?: string;
+  bot_name?: string;
+  greeting_message?: string;
+  placeholder_text?: string;
+  primary_color?: string;
+  text_color?: string;
+  bg_color?: string;
+  user_bubble_color?: string;
+  bot_bubble_color?: string;
+  position?: string;
+  show_branding?: boolean;
+  allow_attachments?: boolean;
+  llm_config_id?: string | null;
+  llm_model?: string;
+  is_active?: boolean;
+  [key: string]: any;
+}
+
 export default function WidgetSettingsPage() {
-  const [widgets, setWidgets] = useState<any[]>([]);
+  const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
@@ -14,7 +35,7 @@ export default function WidgetSettingsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [deleting, setDeleting] = useState(false);
-  const [config, setConfig] = useState<any>({
+  const [config, setConfig] = useState<WidgetConfig>({
     bot_name: "Support Assistant",
     greeting_message: "Hi! How can I help you today?",
     placeholder_text: "Type your message...",
@@ -35,12 +56,20 @@ export default function WidgetSettingsPage() {
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
   const [configuredProviders, setConfiguredProviders] = useState<{value: string, label: string}[]>([]);
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedSnippet(true);
+    setTimeout(() => setCopiedSnippet(false), 2000);
+  };
 
   const fetchAIProviders = useCallback(async () => {
     const companyId = localStorage.getItem("company_id");
     if (!companyId) return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/llm-config/${companyId}`);
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+      const res = await fetch(`${baseUrl}/api/llm-config/${companyId}`);
       if (res.ok) {
         const data = await res.json();
         const providers: {value: string, label: string}[] = [];
@@ -57,7 +86,8 @@ export default function WidgetSettingsPage() {
         setConfiguredProviders(providers);
       }
     } catch (err) {
-      console.error("Failed to load AI providers", err);
+      console.warn("Failed to load AI providers. Is the backend running?", err);
+      setConfiguredProviders([{ value: "", label: "Failed to load providers (Server Error)" }]);
     }
   }, []);
 
@@ -66,7 +96,8 @@ export default function WidgetSettingsPage() {
     if (!companyId) return;
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${companyId}?include_archived=true`);
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+      const res = await fetch(`${baseUrl}/api/widget-config/${companyId}?include_archived=true`);
       if (res.ok) {
         const data = await res.json();
         // data should be an array of widgets
@@ -84,7 +115,8 @@ export default function WidgetSettingsPage() {
         }
       }
     } catch (err) {
-      console.error("Failed to load widgets", err);
+      console.warn("Failed to load widgets. Is the backend running?", err);
+      setMessage({ text: "Failed to connect to the backend server.", type: "error" });
     } finally {
       setLoading(false);
     }
@@ -128,7 +160,8 @@ export default function WidgetSettingsPage() {
         llm_model: ""
       };
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/create`, {
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+      const res = await fetch(`${baseUrl}/api/widget-config/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newConfig)
@@ -144,7 +177,7 @@ export default function WidgetSettingsPage() {
         setMessage({ text: "Failed to create widget.", type: "error" });
       }
     } catch (err) {
-      console.error(err);
+      console.warn(err);
       setMessage({ text: "An error occurred.", type: "error" });
     } finally {
       setCreating(false);
@@ -158,7 +191,8 @@ export default function WidgetSettingsPage() {
     setMessage({ text: "", type: "" });
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${activeWidgetId}`, {
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+      const res = await fetch(`${baseUrl}/api/widget-config/${activeWidgetId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config)
@@ -182,14 +216,15 @@ export default function WidgetSettingsPage() {
     setArchiving(true);
     try {
       const newStatus = config.is_active === false;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${activeWidgetId}/archive?active=${newStatus}`, {
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+      const res = await fetch(`${baseUrl}/api/widget-config/${activeWidgetId}/archive?active=${newStatus}`, {
         method: "PUT"
       });
       if (!res.ok) throw new Error("Failed to archive/unarchive widget");
       setMessage({ text: `Widget ${newStatus ? 'restored' : 'archived'} successfully!`, type: "success" });
       fetchWidgets(activeWidgetId);
     } catch (err) {
-      console.error(err);
+      console.warn(err);
       setMessage({ text: "Failed to update widget status.", type: "error" });
     } finally {
       setArchiving(false);
@@ -201,7 +236,8 @@ export default function WidgetSettingsPage() {
     if (!activeWidgetId) return;
     setDeleting(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/widget-config/${activeWidgetId}`, {
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+      const res = await fetch(`${baseUrl}/api/widget-config/${activeWidgetId}`, {
         method: "DELETE"
       });
       if (!res.ok) throw new Error("Failed to delete widget");
@@ -216,7 +252,7 @@ export default function WidgetSettingsPage() {
       }
       setWidgets(remainingWidgets);
     } catch (err) {
-      console.error(err);
+      console.warn(err);
       setMessage({ text: "Failed to delete widget.", type: "error" });
     } finally {
       setDeleting(false);
@@ -333,8 +369,48 @@ export default function WidgetSettingsPage() {
             <div className="bg-white border border-zinc-200 rounded-xl shadow-sm">
               <form onSubmit={handleSave}>
                 <div className="p-6 space-y-5">
+                  {/* Embed Your Widget */}
+                  {config.widget_key && (
+                    <div className="bg-zinc-950 rounded-xl overflow-hidden border border-zinc-800">
+                      <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+                        <div>
+                          <h3 className="text-sm font-bold text-white">Embed Chat Widget</h3>
+                          <p className="text-xs text-zinc-400 mt-0.5">
+                            Paste before the closing <code className="text-zinc-300 font-mono">&lt;/body&gt;</code> tag
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(`<script src="https://cdn.my-platform.com/widget.js" data-widget-key="${config.widget_key}"></script>`)}
+                          className="flex items-center gap-2 px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold rounded-lg transition-colors border border-zinc-700 cursor-pointer"
+                        >
+                          {copiedSnippet ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <pre className="p-5 overflow-x-auto">
+                        <code className="text-sm font-mono text-zinc-300">
+{`<!-- AI Customer Support Widget -->
+<script
+  src="https://cdn.my-platform.com/widget.js"
+  data-widget-key="${config.widget_key}">
+</script>`}
+                        </code>
+                      </pre>
+                    </div>
+                  )}
+
                   {/* Content */}
-                  <div>
+                  <div className="pt-2">
                     <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">Content</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>

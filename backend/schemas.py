@@ -42,11 +42,12 @@ class DBConnectionCreate(BaseModel):
     company_id: str
     name: str
     db_type: str
-    host: str
-    port: str
-    username: str
-    password: str
-    database_name: str
+    host: str | None = None
+    port: str | None = None
+    username: str | None = None
+    password: str | None = None
+    database_name: str | None = None
+    connection_string: str | None = None
 
 class DBConnectionResponse(BaseModel):
     id: str

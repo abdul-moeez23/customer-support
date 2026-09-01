@@ -71,8 +71,14 @@ def route_query(
         tools_list=tools_text,
     )
 
+    extra_instructions = ""
+    if any("MongoDB" in t.get("description", "") for t in available_tools):
+        extra_instructions = "- When generating logic for MongoDB tools, ensure you generate MongoDB syntax (JSON aggregation pipelines) instead of SQL."
+
+    system_prompt = ROUTER_SYSTEM_PROMPT.format(extra_instructions=extra_instructions)
+
     raw_response = chat(
-        system=ROUTER_SYSTEM_PROMPT,
+        system=system_prompt,
         user=user_prompt,
         provider=provider,
         model=model,

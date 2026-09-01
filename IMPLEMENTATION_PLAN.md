@@ -112,18 +112,23 @@ Based on the requirements and tech stack provided, here is the phased implementa
   - Add a "Save Changes" button in the modal that calls the new PUT endpoint to update mappings.
   - Add a "Delete Connection" button that calls the new DELETE endpoint and removes the connection from the UI.
 
-### [x] Phase 11: Widget Archiving (Soft Delete)
-**Goal:** Allow users to deactivate (hide) widgets rather than permanently deleting them. Archiving is chosen over hard deletion to preserve historical chat logs, prevent broken embed scripts on customer websites, and allow easy recovery.
+### [x] Phase 11: Widget Archiving (Soft Delete) & Permanent Deletion
+**Goal:** Allow users to deactivate (hide) widgets rather than permanently deleting them. Archiving preserves historical chat logs and allows easy recovery, while **disabling the widget's functionality on live websites** to prevent unwanted API usage. Also provide a permanent delete option for users who want to completely clear out unused widgets.
 - [x] **Backend (`backend/models.py` & Alembic):**
   - Add an `is_active` boolean column (default True) to the `WidgetConfig` database model.
   - Generate and apply an Alembic migration for this schema change.
 - [x] **Backend APIs (`backend/main.py`):**
   - Update `GET /api/widget-config/{company_id}` to either filter out archived widgets or include an `is_active` flag so the frontend can hide them.
   - Create a new `PUT /api/widget-config/{widget_id}/archive` endpoint to toggle this status.
+  - Create a new `DELETE /api/widget-config/{widget_id}` endpoint to permanently delete a widget.
+- [x] **Backend Public API Security (`backend/main.py`):**
+  - Update `GET /api/public/widget-config/{widget_key}` to check if `is_active` is true. If false, return a 403 Forbidden or specific inactive status so the widget embed script doesn't render.
+  - Update `POST /api/public/chat` to reject messages (403 Forbidden) if the widget is archived, preventing AI api usage.
 - [x] **Frontend (`frontend/src/app/dashboard/widget-settings/page.tsx`):**
-  - Update the "Select Widget" dropdown to visually indicate archived widgets (e.g., "(Archived)") or filter them out unless a "Show Archived" toggle is checked.
-  - Add an "Archive Widget" button at the bottom of the widget settings form (styled differently from the Save button, perhaps a muted red or outlined gray button).
-  - Add a confirmation modal (similar to the ones designed in Phase 9/10) to confirm archiving, explaining that it hides the widget but preserves history.can find and re-activate hidden widgets.
+  - Update the "Select Widget" dropdown to visually indicate archived widgets. (Completed)
+  - Add an "Archive Widget" button and modal. (Completed)
+  - Add a "Permanent Delete" button with a red confirmation modal. (Completed)
+  - **Enhancement:** Update the permanent delete confirmation modal to require the user to type "delete" into a text input before the delete button is enabled, preventing accidental deletions. (Completed)
 
 ### [x] Phase 12: Per-Widget AI Settings (Provider & Model)
 **Goal:** Transition from a global company-wide LLM model configuration to a per-widget AI configuration, allowing different widgets to utilize different models and providers based on their specific use cases (e.g. GPT-4o for complex support vs Gemini Flash for simple lead capture), while maintaining a global credential vault for API keys.
@@ -155,39 +160,54 @@ Based on the requirements and tech stack provided, here is the phased implementa
   - **`ai-settings/page.tsx`**: Redesign to show a list/table of saved named keys (e.g., "Support Team OpenAI", "Sales Gemini"). Add a form/modal to add new keys (Name, Provider, API Key) and delete existing ones.
   - **`widget-settings/page.tsx`**: Update the "AI Configuration" section. The dropdown should now display the company's specific named keys instead of generic providers. Save the selected key's `id` as `llm_config_id`.
 
-### [ ] Phase 14: Hybrid Database Connection UI (Raw Connection String Support)
+### [x] Phase 14: Hybrid Database Connection UI (Raw Connection String Support)
 **Goal:** Enhance the UX by allowing users to paste a single, fully-formatted database connection string (URI) instead of manually filling out individual fields (Host, Port, Username, etc.). The system will parse the string to maintain compatibility with the existing database schema and driver-restricted dropdown logic.
-- [ ] **Step 1: Backend API Refactoring (`backend/schemas.py`, `backend/main.py`)**
+- [x] **Step 1: Backend API Refactoring (`backend/schemas.py`, `backend/main.py`)**
   - Update `DBConnectionCreate` schema to make `host`, `port`, `username`, `password`, and `database_name` optional if a new `connection_string` field is provided.
   - In `POST /api/connections/database`, add parsing logic using SQLAlchemy's `make_url` to extract the individual fields from the `connection_string` (if provided).
   - Validate that the parsed protocol matches the selected `db_type` from the UI dropdown (e.g., `postgresql://` matches `postgres`) to guarantee driver compatibility.
   - Save the parsed fields to the existing `DatabaseConnection` database model (no Alembic migrations required).
-- [ ] **Step 2: Frontend UI Updates (`frontend/src/app/dashboard/db-connections/page.tsx`)**
+- [x] **Step 2: Frontend UI Updates (`frontend/src/app/dashboard/db-connections/page.tsx`)**
   - Keep the existing "Type" dropdown to enforce safe driver selection.
   - Add a toggle switch or tab system inside the connection form: "Standard Form" vs "Use Connection String".
   - If "Use Connection String" is selected, hide the individual input boxes and show a single text input for the URI.
   - Update the submit handler to send the `connection_string` payload to the backend when the toggle is active.
 
-### [ ] Phase 15: Microsoft SQL Server (MSSQL) Support
+### [x] Phase 15: Microsoft SQL Server (MSSQL) Support
 **Goal:** Expand the platform's enterprise reach by supporting Microsoft SQL Server, integrating seamlessly into the existing SQLAlchemy architecture.
-- [ ] **Step 1: Dependency Updates**
+- [x] **Step 1: Dependency Updates**
   - Add `pymssql` to both `backend/requirements.txt` and `mcp/requirements.txt`.
-- [ ] **Step 2: Connection Logic (`backend/connectors.py` & `mcp/executor.py`)**
+- [x] **Step 2: Connection Logic (`backend/connectors.py` & `mcp/executor.py`)**
   - In `connectors.py`, add `elif db_type == "sqlserver":` and format the connection URL as `mssql+pymssql://{username}:{password}@{host}:{port}/{database_name}`.
   - Replicate this URL construction in `mcp/executor.py`'s `_build_connection_url` function to enable live MCP querying.
-- [ ] **Step 3: Frontend UI (`frontend/src/app/dashboard/db-connections/page.tsx`)**
+- [x] **Step 3: Frontend UI (`frontend/src/app/dashboard/db-connections/page.tsx`)**
   - Add "Microsoft SQL Server" (with value `sqlserver`) to the Database Type dropdown menu.
 
-### [ ] Phase 16: MongoDB (NoSQL) Support & Architecture Update
+### [x] Phase 16: MongoDB (NoSQL) Support & Architecture Update
 **Goal:** Introduce support for MongoDB. Since it is a NoSQL database, this phase requires bypassing SQLAlchemy and introducing specialized connection logic and AI prompt handling for NoSQL aggregation pipelines.
-- [ ] **Step 1: Dependency Updates**
+- [x] **Step 1: Dependency Updates**
   - Add `pymongo` to both `backend/requirements.txt` and `mcp/requirements.txt`.
-- [ ] **Step 2: NoSQL Connection Logic (`backend/connectors.py` & `backend/main.py`)**
+- [x] **Step 2: NoSQL Connection Logic (`backend/connectors.py` & `backend/main.py`)**
   - Create a new function `test_mongo_connection_and_get_collections` using `pymongo.MongoClient` to authenticate and fetch a list of collection names (since MongoDB has no "tables").
   - Update the `/api/connections/database` route to call this new function instead of the SQLAlchemy function when `db_type == "mongodb"`.
-- [ ] **Step 3: MCP NoSQL Tool (`mcp/executor.py` & `mcp/tools.py`)**
+- [x] **Step 3: MCP NoSQL Tool (`mcp/executor.py` & `mcp/tools.py`)**
   - Create a new, dedicated MCP tool (e.g., `execute_mongo_query`) that accepts and executes MongoDB JSON queries/aggregation pipelines via `pymongo`, completely separate from the existing SQL execution tool.
-- [ ] **Step 4: AI Engine Routing & Prompting**
+- [x] **Step 4: AI Engine Routing & Prompting**
   - Update the AI Query Router to detect the `db_type` of the requested widget. If it is `mongodb`, the system prompt must explicitly instruct the LLM to generate MongoDB syntax (JSON) instead of SQL.
-- [ ] **Step 5: Frontend UI (`frontend/src/app/dashboard/db-connections/page.tsx`)**
+- [x] **Step 5: Frontend UI (`frontend/src/app/dashboard/db-connections/page.tsx`)**
   - Add "MongoDB" (with value `mongodb`) to the Database Type dropdown menu.
+
+### [x] Phase 17: Widget Key Visibility and Embed Script Migration
+**Goal:** The system was recently upgraded to support multiple widgets per company (moving widget_key from the Company table to individual WidgetConfig records). Because of this, the main Dashboard page is currently trying to render a single company.widget_key which is undefined. We must migrate the "Embed Widget" logic to the Widget Settings page where individual widgets are managed.
+
+**Code Analysis & Changes Required:**
+- **Issue 1: Main Dashboard (`frontend/src/app/dashboard/page.tsx`)**
+  - *Current State:* Hardcodes `<script ... data-widget-key="{company.widget_key}">` which is `undefined` because multiple widgets exist now.
+  - *Fix:* Remove the "Public Widget Key" row from the Credentials section. Retain the "Embed Chat Widget" visual box on the dashboard, but set `data-widget-key="YOUR_WIDGET_KEY"`. Users will go to the Widget Settings page to get the actual key for their desired widget.
+- **Issue 2: Widget Settings Page (`frontend/src/app/dashboard/widget-settings/page.tsx`)**
+  - *Current State:* Allows creating and editing multiple widgets, but never displays the widget_key or the embed script to the user.
+  - *Fix:* Inject a new "Embed Your Widget" section at the top of the selected widget's configuration form. It should display the selected widget's widget_key and provide a "Copy to Clipboard" button for the <script> tag.
+- **Issue 3: Types (`frontend/src/app/dashboard/widget-settings/page.tsx`)**
+  - *Current State:* The WidgetConfig type in the frontend does not include widget_key.
+- **Next Phase Preparation:**
+  - After these UI changes, we will need to implement the actual widget.js static file that reads this data-widget-key and injects the floating chat interface.

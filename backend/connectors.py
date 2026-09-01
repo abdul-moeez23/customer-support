@@ -10,6 +10,8 @@ def test_db_connection_and_get_tables(db_type, host, port, username, password, d
         url = f"postgresql://{username}:{password}@{host}:{port}/{database_name}"
     elif db_type == "mysql":
         url = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database_name}"
+    elif db_type == "sqlserver":
+        url = f"mssql+pymssql://{username}:{password}@{host}:{port}/{database_name}"
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
         
@@ -22,3 +24,26 @@ def test_db_connection_and_get_tables(db_type, host, port, username, password, d
         return tables
     except Exception as e:
         raise Exception(f"Failed to connect or fetch schema: {str(e)}")
+
+def test_mongo_connection_and_get_collections(host, port, username, password, database_name):
+    """
+    Attempts to connect to MongoDB and fetch a list of collection names.
+    """
+    from pymongo import MongoClient
+    
+    # Build standard mongodb URI
+    if username and password:
+        uri = f"mongodb://{username}:{password}@{host}:{port}/?authSource={database_name}"
+    else:
+        uri = f"mongodb://{host}:{port}/"
+
+    try:
+        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        # Verify connection by asking for the server info
+        client.server_info()
+        
+        db = client[database_name]
+        collections = db.list_collection_names()
+        return collections
+    except Exception as e:
+        raise Exception(f"Failed to connect to MongoDB or fetch collections: {str(e)}")

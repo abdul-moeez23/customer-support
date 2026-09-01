@@ -100,6 +100,74 @@ class MCPToolDefinition:
             limit=min(limit, 50),  # hard cap at 50
         )
 
+class MongoToolDefinition:
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        connection_id: str,
+        host: str,
+        port: str,
+        username: str,
+        encrypted_password: str,
+        database_name: str,
+        collection_name: str,
+        allowed_collections: list[str],
+    ):
+        self.name = name
+        self.description = description
+        self.connection_id = connection_id
+        self.host = host
+        self.port = port
+        self.username = username
+        self.encrypted_password = encrypted_password
+        self.database_name = database_name
+        self.collection_name = collection_name
+        self.allowed_collections = allowed_collections
+
+    def to_schema(self) -> dict:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "pipeline": {
+                        "type": "array",
+                        "description": (
+                            f"MongoDB aggregation pipeline stages (as an array of objects) to query the '{self.collection_name}' collection. "
+                            "Example: [{\"$match\": {\"status\": \"active\"}}]. "
+                            "Leave empty to fetch all documents."
+                        ),
+                        "items": {"type": "object"}
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of documents to return. Defaults to 20, maximum is 50.",
+                        "default": 20,
+                        "minimum": 1,
+                        "maximum": 50,
+                    },
+                },
+                "required": [],
+            },
+        }
+
+    def execute(self, pipeline: list[dict] | None = None, limit: int = 20) -> list[dict]:
+        from .executor import execute_mongo_query
+        plain_password = decrypt(self.encrypted_password)
+        return execute_mongo_query(
+            host=self.host,
+            port=self.port,
+            username=self.username,
+            password=plain_password,
+            database_name=self.database_name,
+            collection_name=self.collection_name,
+            allowed_collections=self.allowed_collections,
+            pipeline=pipeline,
+            limit=min(limit, 50),
+        )
+
 class APIRESTToolDefinition:
     def __init__(
         self,
@@ -203,23 +271,40 @@ def generate_tools_for_company(company_id: str, db: Session, widget_key: str | N
             # Build a clean tool name: "query_<table>" (or "query_<conn>_<table>" if ambiguous)
             tool_name = _make_tool_name(table_name, conn.name, connections)
 
-            tool = MCPToolDefinition(
-                name=tool_name,
-                description=(
-                    f"Query the '{table_name}' table from the '{conn.name}' database connection. "
-                    f"Returns rows matching the provided filters (up to 50 rows). "
-                    f"Use this tool to fetch live data such as orders, customers, tickets, etc."
-                ),
-                connection_id=conn.id,
-                db_type=conn.db_type,
-                host=conn.host,
-                port=conn.port,
-                username=conn.username,
-                encrypted_password=conn.encrypted_password,
-                database_name=conn.database_name,
-                table_name=table_name,
-                allowed_tables=allowed_table_names,
-            )
+            if conn.db_type == "mongodb":
+                tool = MongoToolDefinition(
+                    name=tool_name,
+                    description=(
+                        f"Query the '{table_name}' collection from the '{conn.name}' MongoDB connection. "
+                        f"Returns documents matching the provided pipeline (up to 50 documents). "
+                    ),
+                    connection_id=conn.id,
+                    host=conn.host,
+                    port=conn.port,
+                    username=conn.username,
+                    encrypted_password=conn.encrypted_password,
+                    database_name=conn.database_name,
+                    collection_name=table_name,
+                    allowed_collections=allowed_table_names,
+                )
+            else:
+                tool = MCPToolDefinition(
+                    name=tool_name,
+                    description=(
+                        f"Query the '{table_name}' table from the '{conn.name}' database connection. "
+                        f"Returns rows matching the provided filters (up to 50 rows). "
+                        f"Use this tool to fetch live data such as orders, customers, tickets, etc."
+                    ),
+                    connection_id=conn.id,
+                    db_type=conn.db_type,
+                    host=conn.host,
+                    port=conn.port,
+                    username=conn.username,
+                    encrypted_password=conn.encrypted_password,
+                    database_name=conn.database_name,
+                    table_name=table_name,
+                    allowed_tables=allowed_table_names,
+                )
             tools.append(tool)
 
     api_connections: list[APIConnection] = (

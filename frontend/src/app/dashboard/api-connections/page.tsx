@@ -30,7 +30,7 @@ export default function APIConnectionsPage() {
           setApis(data);
         }
       } catch (err) {
-        console.error("Failed to load API connections", err);
+        console.warn("Failed to load API connections", err);
       }
     };
     fetchApis();

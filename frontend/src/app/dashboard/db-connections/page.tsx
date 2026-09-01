@@ -13,8 +13,10 @@ export default function DBConnectionsPage() {
     port: "5432",
     username: "",
     password: "",
-    database_name: ""
+    database_name: "",
+    connection_string: ""
   });
+  const [useConnectionString, setUseConnectionString] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
   const [tables, setTables] = useState<string[]>([]);
@@ -48,7 +50,7 @@ export default function DBConnectionsPage() {
         }
       }
     } catch (err) {
-      console.error("Failed to load widgets", err);
+      console.warn("Failed to load widgets", err);
     }
   }, []);
 
@@ -64,7 +66,7 @@ export default function DBConnectionsPage() {
         }
       }
     } catch (err) {
-      console.error("Failed to load connections", err);
+      console.warn("Failed to load connections", err);
     }
   }, []);
 
@@ -155,7 +157,7 @@ export default function DBConnectionsPage() {
       if (!res.ok) throw new Error("Failed to delete connection");
       fetchConnections();
     } catch (err) {
-      console.error(err);
+      console.warn(err);
       alert("Failed to delete connection.");
     } finally {
       setConnectionToDelete(null);
@@ -188,7 +190,7 @@ export default function DBConnectionsPage() {
       }
       setTableMapping(map);
     } catch (err) {
-      console.error("Failed to load mappings", err);
+      console.warn("Failed to load mappings", err);
     } finally {
       setLoadingModal(false);
     }
@@ -241,7 +243,7 @@ export default function DBConnectionsPage() {
       setShowManageModal(false);
       setManageConnectionId(null);
     } catch (err) {
-      console.error(err);
+      console.warn(err);
       alert("Failed to save mappings.");
     } finally {
       setLoadingModal(false);
@@ -307,6 +309,8 @@ export default function DBConnectionsPage() {
                       options={[
                         { value: "postgres", label: "PostgreSQL" },
                         { value: "mysql", label: "MySQL" },
+                        { value: "sqlserver", label: "Microsoft SQL Server" },
+                        { value: "mongodb", label: "MongoDB" },
                       ]}
                       aria-label="Database type"
                     />
@@ -325,68 +329,108 @@ export default function DBConnectionsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="host">Host</label>
+              <div className="flex items-center gap-4 py-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 cursor-pointer">
                   <input
-                    id="host"
-                    type="text"
-                    required
-                    className={inputClass}
-                    value={formData.host}
-                    onChange={(e) => setFormData({ ...formData, host: e.target.value })}
+                    type="radio"
+                    name="connection_mode"
+                    checked={!useConnectionString}
+                    onChange={() => setUseConnectionString(false)}
+                    className="cursor-pointer"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="port">Port</label>
+                  Standard Form
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 cursor-pointer">
                   <input
-                    id="port"
-                    type="text"
-                    required
-                    className={inputClass}
-                    value={formData.port}
-                    onChange={(e) => setFormData({ ...formData, port: e.target.value })}
+                    type="radio"
+                    name="connection_mode"
+                    checked={useConnectionString}
+                    onChange={() => setUseConnectionString(true)}
+                    className="cursor-pointer"
                   />
-                </div>
+                  Use Connection String
+                </label>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="database_name">Database Name</label>
-                <input
-                  id="database_name"
-                  type="text"
-                  required
-                  className={inputClass}
-                  value={formData.database_name}
-                  onChange={(e) => setFormData({ ...formData, database_name: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              {useConnectionString ? (
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="username">Username</label>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="connection_string">Connection String (URI)</label>
                   <input
-                    id="username"
+                    id="connection_string"
                     type="text"
-                    required
+                    required={useConnectionString}
                     className={inputClass}
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    value={formData.connection_string}
+                    onChange={(e) => setFormData({ ...formData, connection_string: e.target.value })}
+                    placeholder="postgresql://user:password@localhost:5432/dbname"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="db_password">Password</label>
-                  <input
-                    id="db_password"
-                    type="password"
-                    required
-                    className={inputClass}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="host">Host</label>
+                      <input
+                        id="host"
+                        type="text"
+                        required={!useConnectionString}
+                        className={inputClass}
+                        value={formData.host}
+                        onChange={(e) => setFormData({ ...formData, host: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="port">Port</label>
+                      <input
+                        id="port"
+                        type="text"
+                        required={!useConnectionString}
+                        className={inputClass}
+                        value={formData.port}
+                        onChange={(e) => setFormData({ ...formData, port: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="database_name">Database Name</label>
+                    <input
+                      id="database_name"
+                      type="text"
+                      required={!useConnectionString}
+                      className={inputClass}
+                      value={formData.database_name}
+                      onChange={(e) => setFormData({ ...formData, database_name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="username">Username</label>
+                      <input
+                        id="username"
+                        type="text"
+                        required={!useConnectionString}
+                        className={inputClass}
+                        value={formData.username}
+                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 mb-1.5" htmlFor="db_password">Password</label>
+                      <input
+                        id="db_password"
+                        type="password"
+                        required={!useConnectionString}
+                        className={inputClass}
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               {message.text && (
                 <div className={`flex items-start gap-2.5 text-sm p-3.5 rounded-lg border ${

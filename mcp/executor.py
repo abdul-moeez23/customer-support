@@ -63,6 +63,8 @@ def _build_connection_url(db_type: str, host: str, port: str,
         return f"postgresql://{username}:{password}@{host}:{port}/{database_name}"
     elif db_type == "mysql":
         return f"mysql+pymysql://{username}:{password}@{host}:{port}/{database_name}"
+    elif db_type == "sqlserver":
+        return f"mssql+pymssql://{username}:{password}@{host}:{port}/{database_name}"
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 
@@ -143,3 +145,58 @@ def execute_select_on_table(
         raise Exception(f"Query failed on table '{table_name}': {str(e)}")
     finally:
         engine.dispose()
+
+def execute_mongo_query(
+    host: str,
+    port: str,
+    username: str,
+    password: str,
+    database_name: str,
+    collection_name: str,
+    allowed_collections: list[str],
+    pipeline: list[dict] | None = None,
+    limit: int = 50,
+) -> list[dict]:
+    """
+    Safely execute a NoSQL query (aggregation pipeline) on MongoDB.
+    """
+    if collection_name not in allowed_collections:
+        raise PermissionError(
+            f"Access denied: collection '{collection_name}' is not in the approved access policy. "
+            f"Allowed collections: {allowed_collections}"
+        )
+
+    from pymongo import MongoClient
+    import json
+    
+    if username and password:
+        uri = f"mongodb://{username}:{password}@{host}:{port}/?authSource={database_name}"
+    else:
+        uri = f"mongodb://{host}:{port}/"
+
+    try:
+        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        db = client[database_name]
+        collection = db[collection_name]
+
+        if not pipeline:
+            pipeline = []
+        
+        # enforce limit
+        has_limit = any("$limit" in stage for stage in pipeline)
+        if not has_limit:
+            pipeline.append({"$limit": min(limit, 50)})
+            
+        cursor = collection.aggregate(pipeline)
+        
+        rows = []
+        for doc in cursor:
+            # Convert ObjectId to string to make it JSON serializable
+            if "_id" in doc:
+                doc["_id"] = str(doc["_id"])
+            rows.append(doc)
+            
+        return rows
+    except Exception as e:
+        raise Exception(f"MongoDB query failed on collection '{collection_name}': {str(e)}")
+

@@ -29,7 +29,7 @@ export default function KnowledgeBasePage() {
         }
       }
     } catch (err) {
-      console.error("Failed to load widgets", err);
+      console.warn("Failed to load widgets", err);
     }
   }, []);
 
@@ -45,7 +45,7 @@ export default function KnowledgeBasePage() {
         }
       }
     } catch (err) {
-      console.error("Failed to load documents", err);
+      console.warn("Failed to load documents", err);
     }
   }, []);
 
@@ -108,7 +108,7 @@ export default function KnowledgeBasePage() {
             }
           }
         } catch (err) {
-          console.error("Polling error:", err);
+          console.warn("Polling error:", err);
         }
       }, 2000);
 
@@ -135,7 +135,7 @@ export default function KnowledgeBasePage() {
       setDocId(null);
       fetchDocuments();
     } catch (err) {
-      console.error(err);
+      console.warn(err);
       setMessage({ text: "Failed to save widget access.", type: "error" });
     } finally {
       setSavingWidgets(false);
@@ -153,7 +153,7 @@ export default function KnowledgeBasePage() {
       if (!res.ok) throw new Error("Failed to delete document.");
       fetchDocuments();
     } catch (err) {
-      console.error("Failed to delete document", err);
+      console.warn("Failed to delete document", err);
       alert("Failed to delete document.");
     } finally {
       setDocumentToDelete(null);

@@ -22,7 +22,7 @@ export default function InboxPage() {
         setConversations(data);
       }
     } catch (err) {
-      console.error("Failed to fetch conversations", err);
+      console.warn("Failed to fetch conversations", err);
     } finally {
       setLoading(false);
     }
@@ -41,7 +41,7 @@ export default function InboxPage() {
         setMessages(data.messages);
       }
     } catch (err) {
-      console.error("Failed to fetch messages", err);
+      console.warn("Failed to fetch messages", err);
     }
   };
 
@@ -64,7 +64,7 @@ export default function InboxPage() {
         fetchConversations();
       }
     } catch (err) {
-      console.error("Failed to send reply", err);
+      console.warn("Failed to send reply", err);
     }
   };
 
@@ -79,7 +79,7 @@ export default function InboxPage() {
       fetchConversations();
       setSelectedConv((prev: Record<string, unknown> | null) => prev ? ({ ...prev, status: "resolved" }) : null);
     } catch (err) {
-      console.error("Failed to resolve", err);
+      console.warn("Failed to resolve", err);
     }
   };
 

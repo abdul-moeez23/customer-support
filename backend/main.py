@@ -225,32 +225,65 @@ def search_knowledge_base(request: RAGQuery, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 from encryption import encrypt, decrypt
-from connectors import test_db_connection_and_get_tables
+from connectors import test_db_connection_and_get_tables, test_mongo_connection_and_get_collections
 
 @app.post("/api/connections/database", response_model=schemas.DBConnectionResponse)
 def create_database_connection(request: schemas.DBConnectionCreate, db: Session = Depends(get_db)):
+    # 0. Parse connection string if provided
+    req_host = request.host
+    req_port = request.port
+    req_username = request.username
+    req_password = request.password
+    req_database_name = request.database_name
+
+    if request.connection_string:
+        from sqlalchemy.engine import make_url
+        try:
+            url = make_url(request.connection_string)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid connection string: {str(e)}")
+        
+        driver = url.drivername.split('+')[0]
+        if request.db_type == 'postgres' and driver != 'postgresql':
+            raise HTTPException(status_code=400, detail="Connection string protocol does not match selected database type (postgres).")
+        elif request.db_type == 'mysql' and driver != 'mysql':
+            raise HTTPException(status_code=400, detail="Connection string protocol does not match selected database type (mysql).")
+        elif request.db_type == 'mongodb' and driver != 'mongodb':
+            raise HTTPException(status_code=400, detail="Connection string protocol does not match selected database type (mongodb).")
+        
+        req_host = url.host or ""
+        req_port = str(url.port) if url.port else ""
+        req_username = url.username or ""
+        req_password = url.password or ""
+        req_database_name = url.database or ""
+
     # 1. Test the connection first before saving
     try:
-        tables = test_db_connection_and_get_tables(
-            request.db_type, request.host, request.port, 
-            request.username, request.password, request.database_name
-        )
+        if request.db_type == "mongodb":
+            tables = test_mongo_connection_and_get_collections(
+                req_host, req_port, req_username, req_password, req_database_name
+            )
+        else:
+            tables = test_db_connection_and_get_tables(
+                request.db_type, req_host, req_port, 
+                req_username, req_password, req_database_name
+            )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Database connection failed: {str(e)}")
         
     # 2. Encrypt password
-    enc_password = encrypt(request.password)
+    enc_password = encrypt(req_password)
     
     # 3. Save to DB
     new_conn = models.DatabaseConnection(
         company_id=request.company_id,
         name=request.name,
         db_type=request.db_type,
-        host=request.host,
-        port=request.port,
-        username=request.username,
+        host=req_host,
+        port=req_port,
+        username=req_username,
         encrypted_password=enc_password,
-        database_name=request.database_name
+        database_name=req_database_name
     )
     db.add(new_conn)
     db.commit()
@@ -266,10 +299,16 @@ def get_database_schema(connection_id: str, db: Session = Depends(get_db)):
         
     dec_password = decrypt(conn.encrypted_password)
     try:
-        tables = test_db_connection_and_get_tables(
-            conn.db_type, conn.host, conn.port, 
-            conn.username, dec_password, conn.database_name
-        )
+        if conn.db_type == "mongodb":
+            tables = test_mongo_connection_and_get_collections(
+                conn.host, conn.port, 
+                conn.username, dec_password, conn.database_name
+            )
+        else:
+            tables = test_db_connection_and_get_tables(
+                conn.db_type, conn.host, conn.port, 
+                conn.username, dec_password, conn.database_name
+            )
         return {"tables": tables}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

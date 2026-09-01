@@ -34,6 +34,7 @@ Rules:
 - "rag_search_query" should be a refined version of the user's question optimized for semantic search. Set to null if RAG is not used.
 - If unsure between rag and mcp, prefer "rag+mcp".
 - Always prefer to answer rather than escalate, unless truly necessary.
+{extra_instructions}
 """
 
 ROUTER_USER_TEMPLATE = """Customer message: "{message}"
