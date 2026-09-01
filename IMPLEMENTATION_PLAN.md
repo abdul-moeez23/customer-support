@@ -211,3 +211,16 @@ Based on the requirements and tech stack provided, here is the phased implementa
   - *Current State:* The WidgetConfig type in the frontend does not include widget_key.
 - **Next Phase Preparation:**
   - After these UI changes, we will need to implement the actual widget.js static file that reads this data-widget-key and injects the floating chat interface.
+
+### [ ] Phase 18: Database Connections UI Layout Refactor
+**Goal:** Prevent vertical page bloat caused by the "Connect New Database" form when users have multiple databases, and clarify the widget access mapping UI.
+- [ ] **Step 1: Refactor "Connect New Database" Form**
+  - Extract the existing form (Standard Form & Connection String modes) into a reusable Modal or Slide-out Drawer component.
+  - Add a primary `+ Add Database` button to the top of the "Database Connections" page.
+- [ ] **Step 2: Enhance "Active Connections" List**
+  - Update connection cards to be more compact or switch to a table layout.
+  - Make cards selectable to enter an active state (`selectedConnectionId`).
+- [ ] **Step 3: Implement Dynamic "Widget Access" Panel**
+  - Repurpose the right-side panel ("No tables yet") to respond to the selected database.
+  - When a database is selected, display a list of all available widgets with toggles/checkboxes to manage access.
+  - Include "Save Changes" and "Cancel" actions to send the updated `widget_ids` to the backend.

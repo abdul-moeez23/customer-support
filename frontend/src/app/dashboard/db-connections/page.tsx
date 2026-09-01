@@ -32,10 +32,11 @@ export default function DBConnectionsPage() {
   const [showManageModal, setShowManageModal] = useState(false);
   const [manageConnectionId, setManageConnectionId] = useState<string | null>(null);
   
-  // tableMapping: Record<tableName, string[]> (array of widget IDs)
   const [tableMapping, setTableMapping] = useState<Record<string, string[]>>({});
   const [allTablesInConn, setAllTablesInConn] = useState<string[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
+  const [initialTableSearch, setInitialTableSearch] = useState("");
+  const [manageTableSearch, setManageTableSearch] = useState("");
 
   const fetchWidgets = useCallback(async () => {
     const companyId = localStorage.getItem("company_id");
@@ -475,9 +476,41 @@ export default function DBConnectionsPage() {
                 <h2 className="text-sm font-bold text-zinc-900">Initial Table Access</h2>
               </div>
               <div className="p-5">
-                <p className="text-xs text-zinc-500 mb-4">Select tables the AI can access.</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-zinc-500">Select tables the AI can access.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const visibleTables = tables.filter(t => t.toLowerCase().includes(initialTableSearch.toLowerCase()));
+                      const allSelected = visibleTables.every(t => selectedTables.includes(t));
+                      if (allSelected) {
+                        setSelectedTables(selectedTables.filter(t => !visibleTables.includes(t)));
+                      } else {
+                        const newSelected = [...selectedTables];
+                        visibleTables.forEach(t => {
+                          if (!newSelected.includes(t)) newSelected.push(t);
+                        });
+                        setSelectedTables(newSelected);
+                      }
+                    }}
+                    className="text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md transition-colors"
+                  >
+                    Select All Visible
+                  </button>
+                </div>
+                
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    placeholder="Search tables..."
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 placeholder:text-zinc-400"
+                    value={initialTableSearch}
+                    onChange={(e) => setInitialTableSearch(e.target.value)}
+                  />
+                </div>
+
                 <div className="space-y-1 max-h-48 overflow-y-auto mb-5 border border-zinc-100 rounded-lg p-2">
-                  {tables.map(table => (
+                  {tables.filter(t => t.toLowerCase().includes(initialTableSearch.toLowerCase())).map(table => (
                     <label key={table} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-50 cursor-pointer group transition-colors">
                       <input
                         type="checkbox"
@@ -491,6 +524,11 @@ export default function DBConnectionsPage() {
                       <span className="text-sm font-medium text-zinc-700 group-hover:text-zinc-900 font-mono">{table}</span>
                     </label>
                   ))}
+                  {tables.filter(t => t.toLowerCase().includes(initialTableSearch.toLowerCase())).length === 0 && (
+                    <div className="px-3 py-4 text-center text-zinc-500 text-sm">
+                      No matching tables found.
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t border-zinc-100 pt-4 mb-5">
@@ -549,6 +587,15 @@ export default function DBConnectionsPage() {
             </div>
             
             <p className="text-xs text-zinc-500 mb-4">Select which widgets have access to each table in this database.</p>
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search tables..."
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 placeholder:text-zinc-400"
+                value={manageTableSearch}
+                onChange={(e) => setManageTableSearch(e.target.value)}
+              />
+            </div>
             
             <div className="flex-1 overflow-y-auto border border-zinc-200 rounded-lg bg-zinc-50/30">
               {loadingModal ? (
@@ -564,7 +611,7 @@ export default function DBConnectionsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 text-sm">
-                    {allTablesInConn.map(table => (
+                    {allTablesInConn.filter(t => t.toLowerCase().includes(manageTableSearch.toLowerCase())).map(table => (
                       <tr key={table} className="hover:bg-white transition-colors">
                         <td className="px-4 py-3 font-mono text-zinc-700 whitespace-nowrap align-top pt-4">{table}</td>
                         <td className="px-4 py-3">
@@ -589,10 +636,10 @@ export default function DBConnectionsPage() {
                         </td>
                       </tr>
                     ))}
-                    {allTablesInConn.length === 0 && (
+                    {allTablesInConn.filter(t => t.toLowerCase().includes(manageTableSearch.toLowerCase())).length === 0 && (
                       <tr>
                         <td colSpan={2} className="px-4 py-8 text-center text-zinc-500 text-sm">
-                          No tables found in this connection.
+                          No matching tables found.
                         </td>
                       </tr>
                     )}
